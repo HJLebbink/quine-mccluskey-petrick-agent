@@ -1,4 +1,4 @@
-use super::quine_mccluskey::DummyImplicant;
+use super::algorithm::DummyImplicant;
 
 pub struct PetricksMethod {
     prime_implicants: Vec<DummyImplicant>,

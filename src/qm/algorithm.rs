@@ -1,11 +1,11 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BitState {
     Zero,
     One,
     DontCare,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DummyImplicant {
     bits: Vec<BitState>,
     pub covered_minterms: Vec<u32>,
@@ -30,7 +30,7 @@ impl DummyImplicant {
     }
 
     pub fn get_bit(&self, index: usize) -> BitState {
-        self.bits.get(index).cloned().unwrap_or(BitState::DontCare)
+        self.bits.get(index).copied().unwrap_or(BitState::DontCare)
     }
 
     pub fn can_combine(&self, other: &DummyImplicant) -> bool {
@@ -59,7 +59,7 @@ impl DummyImplicant {
 
         for i in 0..self.bits.len() {
             if self.bits[i] == other.bits[i] {
-                new_bits.push(self.bits[i].clone());
+                new_bits.push(self.bits[i]);
             } else {
                 new_bits.push(BitState::DontCare);
             }

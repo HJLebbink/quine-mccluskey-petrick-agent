@@ -22,12 +22,21 @@ This tool implements the Quine-McCluskey algorithm to minimize Boolean functions
   - Table format
   - Step-by-step solution
 
-- **Features**:
+- **Core Features**:
   - Prime implicant generation
   - Essential prime implicant identification
+  - Petrick's method for minimal cover selection
   - Cost reduction analysis
   - Truth table generation
   - Interactive mode
+
+- **CNF to DNF Conversion**:
+  - Conjunctive Normal Form to Disjunctive Normal Form conversion
+  - Minimal DNF computation with early pruning optimization
+  - SIMD-optimized implementations (AVX2, AVX512)
+  - Multiple bit-width variants (8, 16, 32, 64-bit)
+  - Runtime CPU feature detection with automatic fallback
+  - Up to 4x speedup on large problems with AVX512
 
 ## Installation
 
@@ -51,14 +60,28 @@ anyhow = "1.0"
 
 ### Build
 
+### Option 1: Download Release (Recommended)
+
+Download the latest release from [GitHub Releases](https://github.com/your-username/qmc-rust-agent/releases):
+
 ```bash
-git clone <repository-url>
-cd qmc-rust-agent
-cargo build --release
+# Download and extract installer package
+wget https://github.com/your-username/qmc-rust-agent/releases/latest/download/qmc-rust-agent-installer.tar.gz
+tar -xzf qmc-rust-agent-installer.tar.gz
+cd qmc-rust-agent-*-installer
+
+# Run installer
+./install.sh --global  # Install globally for all projects
 ```
 
-Or run directly with:
+### Option 2: Build from Source
+
 ```bash
+git clone https://github.com/your-username/qmc-rust-agent.git
+cd qmc-rust-agent
+cargo build --release
+
+# Or run directly
 cargo run -- minimize -i "f(A,B) = Σ(1,3)"
 ```
 
@@ -177,7 +200,94 @@ cargo test --test integration_tests
 
 # Run a specific test
 cargo test test_minimize_simple_json
+
+# Run long-running quality tests (100K iterations)
+cargo test --test equality_tests -- --ignored
 ```
+
+## Benchmarks
+
+The project includes comprehensive benchmarks comparing different SIMD optimization levels for CNF to DNF conversion:
+
+```bash
+# Run all benchmarks
+cargo bench --bench cnf_to_dnf_bench
+
+# Run specific benchmark groups
+cargo bench --bench cnf_to_dnf_bench -- optimization_levels
+cargo bench --bench cnf_to_dnf_bench -- problem_sizes
+cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
+```
+
+### Performance Characteristics
+
+The CNF to DNF conversion includes SIMD-optimized implementations using AVX2 and AVX512 intrinsics. Benchmark results on Intel CPUs with AVX512F/BW support reveal:
+
+#### SIMD Speedup by Problem Size
+
+| Problem Size | Best Implementation | Speedup vs Scalar |
+|-------------|---------------------|-------------------|
+| 8 variables | X64 (scalar) | 1.0x (baseline) |
+| 16 variables | X64/AVX512 tie | ~1.0x (break-even) |
+| 32 variables | AVX512_32bits | **301x faster** |
+| 64 variables | AVX512_64bits | **4.0x faster** |
+
+#### Key Findings
+
+1. **Small Problems (< 16 variables)**:
+   - Scalar implementation is **fastest**
+   - SIMD overhead (setup, data movement) exceeds benefits
+   - Typical time: 600-900 nanoseconds
+   - **Recommendation**: Use `OptimizedFor::X64`
+
+2. **Medium Problems (16-32 variables)**:
+   - Break-even point around 16 variables
+   - SIMD shows dramatic gains at 32 variables (301x speedup)
+   - Performance depends heavily on problem structure
+   - **Recommendation**: Use AVX512 variant matching bit width
+
+3. **Large Problems (64 variables)**:
+   - Clear SIMD advantages
+   - AVX512: 4.0x speedup (395ms → 98ms)
+   - AVX2: 2.8x speedup (395ms → 143ms)
+   - Speedup scales with elements per vector (4 for AVX2, 8 for AVX512)
+   - **Recommendation**: Use `OptimizedFor::Avx512_64bits` or `Avx2_64bits`
+
+4. **Early Pruning Optimization**:
+   - Provides consistent **30% speedup** for minimal DNF computation
+   - More effective on larger, denser problems
+   - Discards non-minimal terms during computation
+   - **Recommendation**: Always enable `EARLY_PRUNE = true` for minimal DNF
+
+5. **Conjunction Density Impact**:
+   - Sparse (2 literals): 1.2 µs (baseline)
+   - Medium (4 literals): 5.5 µs (4.6x slower)
+   - Dense (8 literals): 10.4 µs (8.6x slower)
+   - More literals → exponentially more DNF terms
+   - **Recommendation**: Use minimal DNF with pruning for dense problems
+
+#### CPU Requirements
+
+- **AVX2 support**: Intel Haswell (2013+) or AMD Excavator (2015+)
+- **AVX512 support**: Intel Skylake-X (2017+) or AMD Zen 4 (2022+)
+- Automatic fallback to scalar if SIMD not available
+- Runtime CPU feature detection (no recompilation needed)
+
+#### Optimization Selection Guide
+
+```rust
+use qm_agent::cnf_to_dnf::OptimizedFor;
+
+let opt_level = match n_variables {
+    0..=15  => OptimizedFor::X64,              // Scalar fastest
+    16      => OptimizedFor::Avx512_16bits,    // Match bit width
+    17..=32 => OptimizedFor::Avx512_32bits,    // Dramatic speedup
+    33..=64 => OptimizedFor::Avx512_64bits,    // Maximum performance
+    _       => OptimizedFor::X64,              // Fallback
+};
+```
+
+See [`benches/README.md`](benches/README.md) for detailed documentation and [`benches/RESULTS.md`](benches/RESULTS.md) for complete benchmark results.
 
 ## Contributing
 

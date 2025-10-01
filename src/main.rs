@@ -32,7 +32,7 @@ struct QMResponse {
 fn main() {
     let matches = Command::new("qm-agent")
         .version("1.0.0")
-        .author("Your Name")
+        .author("Henk-Jan Lebbink")
         .about("Quine-McCluskey Boolean minimization agent for Claude")
         .subcommand(
             Command::new("minimize")
@@ -84,8 +84,10 @@ fn main() {
 }
 
 fn handle_minimize(matches: &ArgMatches) -> Result<()> {
-    let input = matches.get_one::<String>("input").unwrap();
-    let format = matches.get_one::<String>("format").unwrap();
+    let input = matches.get_one::<String>("input")
+        .expect("input is required by clap");
+    let format = matches.get_one::<String>("format")
+        .expect("format has default value in clap");
     let show_steps = matches.get_flag("show-steps");
     let include_pos = matches.get_flag("include-pos");
 
@@ -134,13 +136,18 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
             .map(|s| s.trim().to_string())
             .collect();
         let minterms: Vec<u32> = caps[2].split(',')
-            .map(|s| s.trim().parse().unwrap())
-            .collect();
+            .map(|s| s.trim().parse())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow!("Failed to parse minterm: {}", e))?;
         let dont_cares: Option<Vec<u32>> = caps.get(3)
-            .map(|m| m.as_str().split(',')
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| s.trim().parse().unwrap())
-                .collect());
+            .map(|m| -> Result<Vec<u32>> {
+                m.as_str().split(',')
+                    .filter(|s| !s.trim().is_empty())
+                    .map(|s| s.trim().parse())
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| anyhow!("Failed to parse don't care term: {}", e))
+            })
+            .transpose()?;
 
         return Ok(QMRequest {
             minterms,
@@ -155,8 +162,9 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
     let simple_pattern = Regex::new(r"minimize\s+minterms?\s+([0-9,\s]+)\s+with\s+(\d+)\s+variables?")?;
     if let Some(caps) = simple_pattern.captures(input) {
         let minterms: Vec<u32> = caps[1].split(',')
-            .map(|s| s.trim().parse().unwrap())
-            .collect();
+            .map(|s| s.trim().parse())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow!("Failed to parse minterm: {}", e))?;
         let variables: usize = caps[2].parse()?;
 
         return Ok(QMRequest {
@@ -236,7 +244,7 @@ fn integrate_your_qm_solver(
     _variable_names: &[String],
     show_steps: bool
 ) -> (String, Vec<String>, Vec<String>, Option<Vec<String>>) {
-    use qm_agent::qm_solver::QMSolver;
+    use qm_agent::QMSolver;
 
     let mut solver = QMSolver::new(variables);
     solver.set_minterms(minterms);

@@ -1,0 +1,292 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: qm-agent
+            archive_name: qmc-rust-agent-linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: qm-agent.exe
+            archive_name: qmc-rust-agent-windows-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: qm-agent
+            archive_name: qmc-rust-agent-macos-x86_64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Create release archive (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        mkdir -p releases/temp/${{ matrix.archive_name }}
+
+        # Copy binary
+        cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} releases/temp/${{ matrix.archive_name }}/
+
+        # Copy documentation and installers
+        cp README.md INSTALL.md CLAUDE.md releases/temp/${{ matrix.archive_name }}/
+        cp install.sh releases/temp/${{ matrix.archive_name }}/
+        chmod +x releases/temp/${{ matrix.archive_name }}/install.sh
+
+        # Copy agent configuration
+        cp -r .claude releases/temp/${{ matrix.archive_name }}/
+
+        # Create quick start guide
+        cat > releases/temp/${{ matrix.archive_name }}/QUICK_START.md << 'EOF'
+        # Quick Start Guide
+
+        ## Installation
+        1. Extract this archive to your desired location
+        2. Run the installer: `./install.sh --global`
+
+        ## Usage
+        ```bash
+        ./qm-agent minimize -i "f(A,B,C) = Σ(1,3,7)"
+        ./qm-agent interactive
+        ./qm-agent examples
+        ```
+
+        For detailed instructions, see INSTALL.md and README.md
+        EOF
+
+        # Create archives
+        cd releases/temp
+        tar -czf ../${{ matrix.archive_name }}.tar.gz ${{ matrix.archive_name }}
+        zip -r ../${{ matrix.archive_name }}.zip ${{ matrix.archive_name }}
+
+    - name: Create release archive (Windows)
+      if: runner.os == 'Windows'
+      shell: cmd
+      run: |
+        mkdir releases\temp\${{ matrix.archive_name }}
+
+        REM Copy binary
+        copy target\${{ matrix.target }}\release\${{ matrix.binary_name }} releases\temp\${{ matrix.archive_name }}\
+
+        REM Copy documentation and installers
+        copy README.md releases\temp\${{ matrix.archive_name }}\
+        copy INSTALL.md releases\temp\${{ matrix.archive_name }}\
+        copy CLAUDE.md releases\temp\${{ matrix.archive_name }}\
+        copy install.bat releases\temp\${{ matrix.archive_name }}\
+
+        REM Copy agent configuration
+        xcopy .claude releases\temp\${{ matrix.archive_name }}\.claude\ /E /I
+
+        REM Create quick start guide
+        echo # Quick Start Guide > releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo. >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo ## Installation >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo 1. Extract this archive to your desired location >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo 2. Run the installer: `install.bat --global` >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo. >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+        echo For detailed instructions, see INSTALL.md and README.md >> releases\temp\${{ matrix.archive_name }}\QUICK_START.md
+
+        REM Create zip archive
+        cd releases\temp
+        powershell Compress-Archive -Path ${{ matrix.archive_name }} -DestinationPath ..\${{ matrix.archive_name }}.zip
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.archive_name }}
+        path: releases/${{ matrix.archive_name }}.*
+
+  create-source-archive:
+    name: Create source archive
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create source archive
+      run: |
+        VERSION=${GITHUB_REF_NAME:-${{ github.event.inputs.version }}}
+        ARCHIVE_NAME="qmc-rust-agent-${VERSION}-source"
+
+        mkdir -p releases/temp
+
+        # Create source archive excluding build artifacts
+        tar --exclude='.git' \
+            --exclude='target' \
+            --exclude='releases' \
+            --exclude='build' \
+            --exclude='*.log' \
+            --exclude='.DS_Store' \
+            -czf releases/${ARCHIVE_NAME}.tar.gz .
+
+        # Create zip version
+        zip -r releases/${ARCHIVE_NAME}.zip . \
+            -x '.git/*' 'target/*' 'releases/*' 'build/*' '*.log' '.DS_Store'
+
+    - name: Upload source artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: source-archives
+        path: releases/qmc-rust-agent-*-source.*
+
+  create-installer-package:
+    name: Create installer package
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create installer package
+      run: |
+        VERSION=${GITHUB_REF_NAME:-${{ github.event.inputs.version }}}
+        ARCHIVE_NAME="qmc-rust-agent-${VERSION}-installer"
+
+        mkdir -p releases/temp/$ARCHIVE_NAME
+
+        # Copy source files needed for installation
+        cp -r src releases/temp/$ARCHIVE_NAME/
+        cp Cargo.toml releases/temp/$ARCHIVE_NAME/
+        cp Cargo.lock releases/temp/$ARCHIVE_NAME/ 2>/dev/null || true
+        cp -r .claude releases/temp/$ARCHIVE_NAME/
+
+        # Copy documentation and installers
+        cp README.md INSTALL.md CLAUDE.md releases/temp/$ARCHIVE_NAME/
+        cp install.sh install.bat releases/temp/$ARCHIVE_NAME/
+        chmod +x releases/temp/$ARCHIVE_NAME/install.sh
+
+        # Copy essential config files
+        cp .gitignore releases/temp/$ARCHIVE_NAME/ 2>/dev/null || true
+
+        # Create archives
+        cd releases/temp
+        tar -czf ../${ARCHIVE_NAME}.tar.gz $ARCHIVE_NAME
+        zip -r ../${ARCHIVE_NAME}.zip $ARCHIVE_NAME
+
+    - name: Upload installer artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: installer-package
+        path: releases/qmc-rust-agent-*-installer.*
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build, create-source-archive, create-installer-package]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+
+    - name: Organize release files
+      run: |
+        mkdir -p releases
+        find artifacts -name "*.tar.gz" -o -name "*.zip" | xargs -I {} mv {} releases/
+        ls -la releases/
+
+    - name: Generate checksums
+      run: |
+        cd releases
+        sha256sum *.tar.gz *.zip > checksums.txt
+
+    - name: Create release notes
+      run: |
+        VERSION=${GITHUB_REF_NAME:-${{ github.event.inputs.version }}}
+        cat > releases/RELEASE_NOTES.md << EOF
+        # QM Rust Agent $VERSION
+
+        A Quine-McCluskey Boolean minimization agent built in Rust, designed for Claude Code integration.
+
+        ## 📦 Download Options
+
+        ### 🚀 For End Users (Recommended)
+        - **qmc-rust-agent-${VERSION}-installer.tar.gz** - Source + installer (Unix/Linux/macOS)
+        - **qmc-rust-agent-${VERSION}-installer.zip** - Source + installer (Windows)
+
+        Download, extract, and run:
+        \`\`\`bash
+        # Unix/Linux/macOS
+        ./install.sh --global
+
+        # Windows
+        install.bat --global
+        \`\`\`
+
+        ### 💻 Pre-built Binaries
+        - **qmc-rust-agent-linux-x86_64.tar.gz** - Linux binary + docs
+        - **qmc-rust-agent-windows-x86_64.zip** - Windows binary + docs
+        - **qmc-rust-agent-macos-x86_64.tar.gz** - macOS binary + docs
+
+        ### 👨‍💻 For Developers
+        - **qmc-rust-agent-${VERSION}-source.tar.gz** - Complete source code
+        - **qmc-rust-agent-${VERSION}-source.zip** - Complete source code
+
+        ## ✨ Features
+
+        - Boolean function minimization using Quine-McCluskey algorithm
+        - Multiple input formats (function notation, JSON, truth tables)
+        - Claude Code integration as subagent
+        - Interactive mode and step-by-step solutions
+        - Cross-platform support (Windows, macOS, Linux)
+
+        ## 🔧 Installation
+
+        See [INSTALL.md](https://github.com/your-username/qmc-rust-agent/blob/main/INSTALL.md) for detailed installation instructions.
+
+        ## 🔐 Verification
+
+        Verify downloads with SHA256 checksums in \`checksums.txt\`
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name || github.event.inputs.version }}
+        name: QM Rust Agent ${{ github.ref_name || github.event.inputs.version }}
+        body_path: releases/RELEASE_NOTES.md
+        files: |
+          releases/*.tar.gz
+          releases/*.zip
+          releases/checksums.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

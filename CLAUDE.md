@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Rust-based Quine-McCluskey Boolean minimization agent designed as a CLI tool for Claude to use for Boolean function minimization tasks. The project consists of both a library (`qm_agent`) and a binary (`qm-agent`) that provides multiple input formats and output modes.
+This is a Rust-based Boolean logic optimization library and CLI tool featuring:
+- **Quine-McCluskey algorithm** for Boolean function minimization
+- **CNF to DNF conversion** with SIMD-optimized implementations (AVX2, AVX512)
+- **Petrick's method** for minimal cover selection
+- Multiple input/output formats for easy integration
+
+The project consists of both a library (`qm_agent`) and a binary (`qm-agent`) that provides comprehensive Boolean algebra operations.
 
 ## Essential Commands
 
@@ -24,6 +30,40 @@ cargo test --test integration_tests
 
 # Run a specific test
 cargo test test_minimize_simple_json
+
+# Run long-running equality tests (100K iterations)
+cargo test --test equality_tests -- --ignored
+```
+
+### Running Examples
+
+```bash
+# Quine-McCluskey examples
+cargo run --example qm_simple_3bit
+cargo run --example qm_petricks_method
+cargo run --example qm_wolfram_verified
+
+# CNF to DNF conversion examples
+cargo run --example cnf_2_dnf_0
+cargo run --example cnf_2_dnf_5
+
+# See examples/README.md for full list and descriptions
+```
+
+### Running Benchmarks
+
+```bash
+# Run all benchmarks
+cargo bench --bench cnf_to_dnf_bench
+
+# Run specific benchmark groups
+cargo bench --bench cnf_to_dnf_bench -- optimization_levels
+cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
+
+# Save baseline for comparison
+cargo bench --bench cnf_to_dnf_bench -- --save-baseline main
+
+# See benches/README.md for detailed documentation
 ```
 
 ### Running the CLI
@@ -53,17 +93,34 @@ cargo run -- examples
 - `QMResult`: Result structure containing minimized expressions, prime implicants, and solution steps
 - Convenience functions for common operations (parsing, variable name generation)
 
-**QM Solver Module** (`src/qm_solver/`):
-- `quine_mccluskey.rs`: Core QM algorithm implementation with `DummyImplicant` and `BitState` types
-- `petricks_method.rs`: Implementation of Petrick's method for finding minimal covers
+**QM Module** (`src/qm/`):
+- `algorithm.rs`: Core QM algorithm implementation with `DummyImplicant` and `BitState` types
+- `petricks.rs`: Implementation of Petrick's method for finding minimal covers
+- `classic.rs`: C++ API-compatible port with preserved naming conventions
 - `utils.rs`: Utility functions for the QM algorithm
-- `mod.rs`: Module interface and `QMSolver` orchestration
+- `solver.rs`: `QMSolver` orchestration and public API
+- `mod.rs`: Module interface with convenient re-exports
 
 **CLI Binary** (`src/main.rs`):
 - Complete CLI with subcommands: `minimize`, `interactive`, `examples`
 - Multiple input parsers: JSON, function notation (f(A,B) = Σ(1,3)), simple text, truth tables
 - Multiple output formats: human-readable, JSON, table, step-by-step
 - Interactive mode for iterative problem solving
+
+**CNF to DNF Module** (`src/cnf_dnf/`):
+- `convert.rs`: Main conversion logic and algorithms
+  - `convert_cnf_to_dnf()`: Convert Conjunctive Normal Form to Disjunctive Normal Form
+  - `convert_cnf_to_dnf_minimal()`: Find minimal DNF with early pruning optimization
+  - `OptimizedFor` enum: Select optimization level (X64, AVX2, AVX512 variants)
+  - Subsumption checking to minimize resulting DNF
+  - String-based variable name support via `convert_cnf_to_dnf_translated()`
+- `simd.rs`: SIMD-optimized implementations (x86_64 only)
+  - AVX512 implementations for 8-bit, 16-bit, 32-bit, and 64-bit elements
+  - AVX2 implementation for 64-bit elements
+  - Runtime CPU feature detection with automatic fallback
+  - Up to 4x speedup on large problems (64 variables) with AVX512
+  - Platform-independent fallback implementations for non-x86_64 architectures
+- `mod.rs`: Module interface with convenient re-exports
 
 ### Integration Pattern
 
@@ -92,19 +149,55 @@ The CLI provides multiple output formats:
 
 ## Testing Structure
 
-- **Unit tests**: Located in `src/lib.rs`, test core library functionality
-- **Integration tests**: Located in `tests/integration_tests.rs`, test CLI behavior end-to-end
+- **Unit tests**: Located in `src/lib.rs` and module files, test core library functionality (14 tests)
+- **Integration tests**: Located in `tests/integration_tests.rs`, test CLI behavior end-to-end (10 tests)
+- **Equality tests**: Located in `tests/equality_tests.rs`, randomized quality assurance tests
+  - `quick_equality_smoke_test`: 100 iterations (runs by default)
+  - `equality_test`: 100,000 iterations testing all optimization levels (run with `--ignored`)
+  - `equality_test_minimal`: 100,000 iterations testing early pruning correctness (run with `--ignored`)
+- **Examples**: 15 total (7 CNF to DNF + 8 QM) with comprehensive README documentation
+- **Benchmarks**: Criterion-based benchmarks in `benches/cnf_to_dnf_bench.rs`
+  - 6 benchmark groups comparing X64, AVX2, and AVX512 performance
+  - Detailed results and analysis in `benches/RESULTS.md`
 - Integration tests use `assert_cmd` and `predicates` for CLI testing
 - Tests cover all input formats, output formats, error conditions, and edge cases
 
 ## Key Implementation Notes
 
-- The QM algorithm uses a `DummyImplicant` structure with `BitState` enum (Zero, One, DontCare)
-- Prime implicants are found through iterative combining until no more combinations are possible
-- Essential prime implicants are currently simplified (taking first half of prime implicants)
-- The Petrick's method implementation uses a greedy approach for minimal cover selection
+### Quine-McCluskey Algorithm
+- Uses `DummyImplicant` structure with `BitState` enum (Zero, One, DontCare)
+- `BitState` is `Copy` for zero-cost operations
+- Prime implicants found through iterative combining until no more combinations possible
+- Essential prime implicants currently simplified (taking first half of prime implicants)
+- Petrick's method uses greedy approach for minimal cover selection
 - Variable names default to A, B, C, D... but can be customized
 - Unicode handling in CLI arguments requires careful encoding (avoid raw Σ symbols in tests)
+
+### CNF to DNF Conversion
+- Uses bit-level operations on u64 for efficient term representation
+- Subsumption checking: If `z | q == z`, then z is subsumed; if `z | q == q`, then q is subsumed
+- **Critical**: Uses O(n) filtering with HashSet for deletions (not O(n²) repeated Vec::remove)
+- Early pruning optimization discards non-minimal terms during computation
+- `OptimizedFor` enum controls which SIMD implementation to use
+- Maximum 64 variables for u64-based representation
+
+### SIMD Optimizations
+- Runtime CPU feature detection with `is_x86_feature_detected!()`
+- Automatic fallback to scalar implementation if SIMD unavailable
+- **Performance characteristics**:
+  - Small problems (< 16 vars): Scalar X64 fastest due to SIMD overhead
+  - Medium problems (16-32 vars): Break-even point, dramatic gains at 32 vars
+  - Large problems (64 vars): 4.0x speedup with AVX512, 2.8x with AVX2
+- AVX512 variants process 64, 32, 16, or 8 elements per vector depending on bit width
+- All unsafe SIMD code properly wrapped with safe public APIs
+- Rust 2024 edition requires inner `unsafe` blocks within `unsafe fn`
+
+### Code Idioms and Best Practices
+- Proper error handling: No `unwrap()` in user-facing code, use `?` operator
+- Pre-allocated vectors with `Vec::with_capacity()` where size is known
+- `PartialEq` and `Eq` derives for testability
+- Associated methods on enums for DRY principle (e.g., `OptimizedFor::max_bits()`)
+- Functional style preferred where it improves clarity
 
 ## Agent Registration and Distribution
 
@@ -146,6 +239,8 @@ Claude Code will automatically detect and use the `qm-agent` subagent when users
 - Mention Karnaugh maps or K-maps
 - Request digital logic optimization
 - Need help with Boolean algebra problems
+- Request CNF to DNF conversion
+- Ask about SIMD optimization for Boolean operations
 - Specifically mention the Quine-McCluskey algorithm
 
 Example user requests that trigger the agent:
@@ -153,3 +248,13 @@ Example user requests that trigger the agent:
 - "Help me simplify this Karnaugh map"
 - "Optimize this digital logic circuit"
 - "Find the prime implicants for these minterms"
+- "Convert this CNF formula to DNF"
+- "What's the minimal DNF for this Boolean expression?"
+
+## Additional Resources
+
+- **README.md**: User-facing documentation with installation and usage
+- **IMPROVEMENTS.md**: Detailed log of code improvements and idioms applied
+- **benches/README.md**: Comprehensive benchmark documentation
+- **benches/RESULTS.md**: Sample benchmark results and analysis
+- **examples/README.md**: Descriptions of all 15 examples

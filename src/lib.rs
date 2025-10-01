@@ -3,12 +3,13 @@
 //! A Rust library for Boolean function minimization using the Quine-McCluskey
 //! algorithm with Petrick's method.
 
-pub mod qm_solver;
+pub mod qm;        // Quine-McCluskey algorithm and solver
+pub mod cnf_dnf;   // CNF to DNF conversion with SIMD
 
 // Re-export the main types
-pub use qm_solver::{QMSolver, QMResult};
-pub use qm_solver::quine_mccluskey::{QuineMcCluskey, DummyImplicant, BitState};
-pub use qm_solver::petricks_method::PetricksMethod;
+pub use qm::{QMSolver, QMResult};
+pub use qm::{QuineMcCluskey, DummyImplicant, BitState};
+pub use qm::PetricksMethod;
 
 /// Convenience function to minimize a Boolean function
 pub fn minimize_function(

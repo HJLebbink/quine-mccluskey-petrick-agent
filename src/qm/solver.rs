@@ -1,11 +1,7 @@
-pub mod quine_mccluskey;
-pub mod petricks_method;
-pub mod utils;
+use crate::qm::algorithm::{BitState, DummyImplicant, QuineMcCluskey};
+use crate::qm::petricks::PetricksMethod;
 
-pub use quine_mccluskey::{QuineMcCluskey, DummyImplicant, BitState};
-pub use petricks_method::PetricksMethod;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct QMResult {
     pub minimized_expression: String,
     pub prime_implicants: Vec<String>,
