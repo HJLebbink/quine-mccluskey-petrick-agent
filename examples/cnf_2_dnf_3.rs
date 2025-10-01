@@ -2,6 +2,7 @@
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::time::Instant;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
@@ -21,8 +22,15 @@ fn main() {
 
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
 
-    let dnf = cnf_dnf::convert_cnf_to_dnf(&cnf, N_BITS, OptimizedFor::X64);
+    //let of = OptimizedFor::detect_best(N_BITS);
+    let of = OptimizedFor::Avx512_64bits;
+    println!("Optimized for = {}", of);
+
+    let start = Instant::now();
+    let dnf = cnf_dnf::convert_cnf_to_dnf(&cnf, N_BITS, of);
+    let duration = start.elapsed();
 
     println!("DNF size = {}", dnf.len());
+    println!("Runtime: {:?}", duration);
     // Note: Full DNF not printed due to size
 }

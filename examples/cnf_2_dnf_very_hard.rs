@@ -1,6 +1,7 @@
 // Very hard CNF problem found when generating popcnt_6_3
 // 35 conjunctions with 60 variables
 
+use std::time::Instant;
 use qm_agent::cnf_dnf::{self, OptimizedFor};
 
 fn main() {
@@ -45,10 +46,16 @@ fn main() {
     ];
 
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
-    println!("Computing minimal DNF (this may take a while)...");
 
-    let dnf = cnf_dnf::convert_cnf_to_dnf_minimal(&cnf, N_BITS, OptimizedFor::X64, true);
+    let of = OptimizedFor::detect_best(64);
+    println!("Optimized for = {}", of);
+
+    println!("Computing minimal DNF (this may take a while)...");
+    let start = Instant::now();
+    let dnf = cnf_dnf::convert_cnf_to_dnf_minimal(&cnf, N_BITS, of, true);
+    let duration = start.elapsed();
 
     println!("DNF = {}", cnf_dnf::dnf_to_string(&dnf));
     println!("Minimal DNF has {} terms", dnf.len());
+    println!("Runtime: {:?}", duration);
 }

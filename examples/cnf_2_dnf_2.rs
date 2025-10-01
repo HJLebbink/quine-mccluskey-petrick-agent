@@ -2,6 +2,7 @@
 // DNF =  (A&B&D&F) | (A&C&E&F) | (A&D&E) | (B&C&D&E) | (B&C&F)
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use std::time::Instant;
 
 fn main() {
     let cnf = vec![
@@ -15,7 +16,10 @@ fn main() {
 
     println!("CNF = {:?}", cnf);
 
+    let start = Instant::now();
     let dnf = cnf_dnf::convert_cnf_to_dnf_with_names(&cnf, OptimizedFor::X64);
+    let duration = start.elapsed();
 
     println!("DNF = {:?}", dnf);
+    println!("Runtime: {:?}", duration);
 }

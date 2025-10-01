@@ -1,0 +1,4 @@
+=== MAX_16_BITS Performance Benchmark ===
+
+Creating backup of src\qm\classic.rs
+Setting MAX_16_BITS = false (32-bit mode)

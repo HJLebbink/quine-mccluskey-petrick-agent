@@ -72,7 +72,7 @@ unsafe fn optimized_for_avx512_epi8(result_dnf_next: &[u64], z: u64) -> (Vec<usi
 /// AVX512 optimized for 16-bit elements (32 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi16(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi16_internal(result_dnf_next: &[u16], z: u16) -> (Vec<usize>, bool) {
     const NB: usize = 5; // log2(32)
     let mut index_to_delete = Vec::with_capacity(32);
 
@@ -103,14 +103,16 @@ unsafe fn optimized_for_avx512_epi16(result_dnf_next: &[u64], z: u64) -> (Vec<us
         }
     }
 
-    let add_z = handle_tail_x64(result_dnf_next, z, n_blocks << NB, &mut index_to_delete);
+    // Handle tail with u64 conversion for compatibility
+    let result_u64: Vec<u64> = result_dnf_next.iter().map(|&x| x as u64).collect();
+    let add_z = handle_tail_x64(&result_u64, z as u64, n_blocks << NB, &mut index_to_delete);
     (index_to_delete, add_z)
 }
 
 /// AVX512 optimized for 32-bit elements (16 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi32(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi32_internal(result_dnf_next: &[u32], z: u32) -> (Vec<usize>, bool) {
     const NB: usize = 4; // log2(16)
     let mut index_to_delete = Vec::with_capacity(16);
 
@@ -141,7 +143,9 @@ unsafe fn optimized_for_avx512_epi32(result_dnf_next: &[u64], z: u64) -> (Vec<us
         }
     }
 
-    let add_z = handle_tail_x64(result_dnf_next, z, n_blocks << NB, &mut index_to_delete);
+    // Handle tail with u64 conversion for compatibility
+    let result_u64: Vec<u64> = result_dnf_next.iter().map(|&x| x as u64).collect();
+    let add_z = handle_tail_x64(&result_u64, z as u64, n_blocks << NB, &mut index_to_delete);
     (index_to_delete, add_z)
 }
 
@@ -237,7 +241,9 @@ pub fn run_avx512_64bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) 
 #[cfg(target_arch = "x86_64")]
 pub fn run_avx512_32bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     if is_x86_feature_detected!("avx512f") {
-        unsafe { optimized_for_avx512_epi32(result_dnf_next, z) }
+        // This ensures the SIMD operations work on correctly sized elements
+        let result_u32: Vec<u32> = result_dnf_next.iter().map(|&x| x as u32).collect();
+        unsafe { optimized_for_avx512_epi32_internal(&result_u32, z as u32) }
     } else {
         super::convert::optimized_for_x64(result_dnf_next, z)
     }
@@ -247,7 +253,9 @@ pub fn run_avx512_32bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) 
 #[cfg(target_arch = "x86_64")]
 pub fn run_avx512_16bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     if is_x86_feature_detected!("avx512f") {
-        unsafe { optimized_for_avx512_epi16(result_dnf_next, z) }
+        // This ensures the SIMD operations work on correctly sized elements
+        let result_u16: Vec<u16> = result_dnf_next.iter().map(|&x| x as u16).collect();
+        unsafe { optimized_for_avx512_epi16_internal(&result_u16, z as u16) }
     } else {
         super::convert::optimized_for_x64(result_dnf_next, z)
     }

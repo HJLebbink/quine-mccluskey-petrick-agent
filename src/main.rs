@@ -1,4 +1,4 @@
-use clap::{Arg, Command, ArgMatches};
+use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashSet;
@@ -6,6 +6,49 @@ use std::fs;
 use std::io::{self, Write};
 use regex::Regex;
 use anyhow::{Result, anyhow};
+
+/// Quine-McCluskey Boolean minimization agent for Claude
+#[derive(Parser)]
+#[command(name = "qm-agent", version = "1.0.0", author = "Henk-Jan Lebbink")]
+#[command(about = "Quine-McCluskey Boolean minimization agent for Claude", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Minimize a Boolean function
+    Minimize {
+        /// Input: JSON file path, inline JSON, or natural language
+        #[arg(short, long)]
+        input: String,
+
+        /// Output format
+        #[arg(short, long, default_value = "human")]
+        format: OutputFormat,
+
+        /// Show step-by-step solution
+        #[arg(long)]
+        show_steps: bool,
+
+        /// Include Product of Sums form
+        #[arg(long)]
+        include_pos: bool,
+    },
+    /// Interactive mode for complex queries
+    Interactive,
+    /// Show usage examples
+    Examples,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
+enum OutputFormat {
+    Json,
+    Human,
+    Table,
+    Steps,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct QMRequest {
@@ -30,51 +73,14 @@ struct QMResponse {
 }
 
 fn main() {
-    let matches = Command::new("qm-agent")
-        .version("1.0.0")
-        .author("Henk-Jan Lebbink")
-        .about("Quine-McCluskey Boolean minimization agent for Claude")
-        .subcommand(
-            Command::new("minimize")
-                .about("Minimize a Boolean function")
-                .arg(Arg::new("input")
-                    .short('i')
-                    .long("input")
-                    .help("Input: JSON file path, inline JSON, or natural language")
-                    .required(true))
-                .arg(Arg::new("format")
-                    .short('f')
-                    .long("format")
-                    .help("Output format")
-                    .value_parser(["json", "human", "table", "steps"])
-                    .default_value("human"))
-                .arg(Arg::new("show-steps")
-                    .long("show-steps")
-                    .help("Show step-by-step solution")
-                    .action(clap::ArgAction::SetTrue))
-                .arg(Arg::new("include-pos")
-                    .long("include-pos")
-                    .help("Include Product of Sums form")
-                    .action(clap::ArgAction::SetTrue))
-        )
-        .subcommand(
-            Command::new("interactive")
-                .about("Interactive mode for complex queries")
-        )
-        .subcommand(
-            Command::new("examples")
-                .about("Show usage examples")
-        )
-        .get_matches();
+    let cli = Cli::parse();
 
-    let result = match matches.subcommand() {
-        Some(("minimize", sub_matches)) => handle_minimize(sub_matches),
-        Some(("interactive", _)) => handle_interactive(),
-        Some(("examples", _)) => handle_examples(),
-        _ => {
-            eprintln!("Use --help for usage information");
-            std::process::exit(1);
+    let result = match cli.command {
+        Commands::Minimize { input, format, show_steps, include_pos } => {
+            handle_minimize(&input, format, show_steps, include_pos)
         }
+        Commands::Interactive => handle_interactive(),
+        Commands::Examples => handle_examples(),
     };
 
     if let Err(e) = result {
@@ -83,14 +89,12 @@ fn main() {
     }
 }
 
-fn handle_minimize(matches: &ArgMatches) -> Result<()> {
-    let input = matches.get_one::<String>("input")
-        .expect("input is required by clap");
-    let format = matches.get_one::<String>("format")
-        .expect("format has default value in clap");
-    let show_steps = matches.get_flag("show-steps");
-    let include_pos = matches.get_flag("include-pos");
-
+fn handle_minimize(
+    input: &str,
+    format: OutputFormat,
+    show_steps: bool,
+    include_pos: bool,
+) -> Result<()> {
     // Parse input in various formats
     let request = parse_input(input)?;
 
@@ -98,12 +102,11 @@ fn handle_minimize(matches: &ArgMatches) -> Result<()> {
     let result = run_quine_mccluskey(&request, show_steps, include_pos)?;
 
     // Output in requested format
-    match format.as_str() {
-        "json" => println!("{}", serde_json::to_string_pretty(&result)?),
-        "human" => print_human_readable(&result),
-        "table" => print_table_format(&result),
-        "steps" => print_steps(&result),
-        _ => return Err(anyhow!("Unknown format: {}", format)),
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
+        OutputFormat::Human => print_human_readable(&result),
+        OutputFormat::Table => print_table_format(&result),
+        OutputFormat::Steps => print_steps(&result),
     }
 
     Ok(())
@@ -442,27 +445,59 @@ fn print_examples() {
     println!("\n📚 Usage Examples:");
     println!("==================");
 
+    println!("\n🔹 Boolean Minimization (Quine-McCluskey):");
+    println!("─────────────────────────────────────────");
+
     println!("\n1. Function notation:");
     println!("   qm-agent minimize -i 'f(A,B,C) = Σ(1,3,7)'");
+    println!("   → Minimizes f(A,B,C) with minterms 1, 3, 7");
 
     println!("\n2. With don't cares:");
     println!("   qm-agent minimize -i 'f(A,B,C) = Σ(1,3,7) + d(2,4)'");
+    println!("   → Uses don't care terms 2, 4 for better minimization");
 
     println!("\n3. Simple format:");
     println!("   qm-agent minimize -i 'minimize minterms 1,3,7 with 3 variables'");
+    println!("   → Plain English input");
 
     println!("\n4. JSON format:");
     println!("   qm-agent minimize -i '{{\"minterms\": [1,3,7], \"variables\": 3}}'");
+    println!("   → Structured input for automation");
 
     println!("\n5. Truth table:");
     println!("   qm-agent minimize -i 'truth table: 00110110'");
+    println!("   → Direct truth table input (8 bits = 3 variables)");
 
     println!("\n6. From file:");
     println!("   qm-agent minimize -i input.json");
+    println!("   → Read from JSON file");
 
-    println!("\n7. Show steps:");
+    println!("\n7. Show step-by-step solution:");
     println!("   qm-agent minimize -i 'f(A,B) = Σ(1,3)' --show-steps");
+    println!("   → Educational mode with detailed steps");
 
-    println!("\n8. Interactive mode:");
+    println!("\n8. Different output formats:");
+    println!("   qm-agent minimize -i 'f(A,B) = Σ(1,3)' -f json");
+    println!("   qm-agent minimize -i 'f(A,B) = Σ(1,3)' -f table");
+    println!("   qm-agent minimize -i 'f(A,B) = Σ(1,3)' -f steps");
+    println!("   → Format: human (default), json, table, steps");
+
+    println!("\n9. Interactive mode:");
     println!("   qm-agent interactive");
+    println!("   → REPL for iterative problem solving");
+
+    println!("\n🔹 If-Then-Else Simplification:");
+    println!("────────────────────────────────");
+    println!("\nThe library also supports if-then-else simplification with:");
+    println!("• Boolean expression minimization");
+    println!("• Dead code detection");
+    println!("• Coverage analysis");
+    println!("• Integer comparison operators (==, <, >, <=, >=, !=)");
+
+    println!("\nRun these examples:");
+    println!("   cargo run --example simplify_if_then_else");
+    println!("   cargo run --example dead_code_detection");
+    println!("   cargo run --example comparison_operators");
+
+    println!("\nSee examples/ directory for full code samples.");
 }

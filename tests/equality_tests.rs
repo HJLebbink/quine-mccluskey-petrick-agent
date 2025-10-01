@@ -47,8 +47,8 @@ fn equality_test() {
             cnf_64.push(conjunction);
         }
 
-        // Reference implementation: X64
-        let dnf_64x = cnf_dnf::convert_cnf_to_dnf(&cnf_64, n_variables, OptimizedFor::X64);
+        // Reference implementation: auto-detect best optimization
+        let dnf_64x = cnf_dnf::convert_cnf_to_dnf(&cnf_64, n_variables, OptimizedFor::detect_best(n_variables));
 
         // Test all optimized versions (currently all fall back to X64, but structure is here)
         if n_variables <= 64 {
@@ -183,28 +183,57 @@ fn quick_equality_smoke_test() {
     // Quick smoke test (runs as part of normal test suite)
     let mut rng = StdRng::seed_from_u64(42);
 
-    for _ in 0..100 {
-        let n_variables = rng.gen_range(1..=16); // Keep it small for fast testing
-        let n_conjunctions = rng.gen_range(1..=5);
-        let n_disjunctions = rng.gen_range(1..=n_variables);
+    const N_EXPERIMENTS: usize = 100;
 
-        let mut cnf: Vec<u64> = Vec::new();
-        for _ in 0..n_conjunctions {
-            let mut conjunction = 0u64;
-            for _ in 0..n_disjunctions {
-                let r = rng.gen_range(0..n_variables);
-                conjunction |= 1u64 << r;
+    for _ in 0..N_EXPERIMENTS {
+
+        for n_variables in [1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 40] {
+            let n_conjunctions = rng.gen_range(1..=5);
+            let n_disjunctions = rng.gen_range(1..=n_variables);
+
+            let mut cnf: Vec<u64> = Vec::new();
+            for _ in 0..n_conjunctions {
+                let mut conjunction = 0u64;
+                for _ in 0..n_disjunctions {
+                    let r = rng.gen_range(0..n_variables);
+                    conjunction |= 1u64 << r;
+                }
+                cnf.push(conjunction);
             }
-            cnf.push(conjunction);
+
+            let dnf_x64 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::X64);
+
+            if n_variables <= 64 {
+                let dnf_avx512_64 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_64bits);
+                assert!(
+                    dnf_equal(&dnf_x64, &dnf_avx512_64),
+                    "DNF mismatch in quick smoke test. x64 != avx512_64bits"
+                );
+            }
+
+            if n_variables <= 32 {
+                let dnf_avx512_32 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_32bits);
+                assert!(
+                    dnf_equal(&dnf_x64, &dnf_avx512_32),
+                    "DNF mismatch in quick smoke test. x64 != avx512_32bits"
+                );
+            }
+
+            if n_variables <= 16 {
+                let dnf_avx512_16 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_16bits);
+                assert!(
+                    dnf_equal(&dnf_x64, &dnf_avx512_16),
+                    "DNF mismatch in quick smoke test. x64 != avx512_16bits"
+                );
+            }
+
+            if n_variables <= 8 {
+                let dnf_avx512_8 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_8bits);
+                assert!(
+                    dnf_equal(&dnf_x64, &dnf_avx512_8),
+                    "DNF mismatch in quick smoke test. x64 != avx512_8bits"
+                );
+            }
         }
-
-        let dnf_x64 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::X64);
-        let dnf_avx512 =
-            cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_64bits);
-
-        assert!(
-            dnf_equal(&dnf_x64, &dnf_avx512),
-            "DNF mismatch in quick smoke test"
-        );
     }
 }

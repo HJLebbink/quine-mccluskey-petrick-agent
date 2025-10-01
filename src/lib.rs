@@ -5,6 +5,7 @@
 
 pub mod qm;        // Quine-McCluskey algorithm and solver
 pub mod cnf_dnf;   // CNF to DNF conversion with SIMD
+pub mod simplify;  // If-then-else simplification
 
 // Re-export the main types
 pub use qm::{QMSolver, QMResult};

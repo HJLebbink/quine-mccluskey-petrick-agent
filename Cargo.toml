@@ -30,3 +30,7 @@ criterion = "0.5"
 [[bench]]
 name = "cnf_to_dnf_bench"
 harness = false
+
+[[bench]]
+name = "max_16_bits_bench"
+harness = false

@@ -2,6 +2,7 @@
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::time::Instant;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
@@ -22,7 +23,10 @@ fn main() {
 
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
 
+    let start = Instant::now();
     let min_dnf = cnf_dnf::convert_cnf_to_dnf_minimal(&cnf, N_BITS, OptimizedFor::X64, EARLY_PRUNE);
+    let duration = start.elapsed();
 
     println!("DNF_min = {}", cnf_dnf::dnf_to_string(&min_dnf));
+    println!("Runtime: {:?}", duration);
 }

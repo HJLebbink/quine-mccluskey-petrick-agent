@@ -23,6 +23,82 @@ impl OptimizedFor {
             Self::Avx512_64bits | Self::Avx2_64bits | Self::X64 => 64,
         }
     }
+
+    /// Automatically detect the best optimization level for the current hardware
+    ///
+    /// This function performs runtime CPU feature detection and selects the most
+    /// advanced SIMD instruction set available. It checks in order:
+    /// 1. AVX-512 (if available and n_variables <= 64)
+    /// 2. AVX2 (if available and n_variables <= 64)
+    /// 3. X64 scalar fallback (always available)
+    ///
+    /// # Arguments
+    /// * `n_variables` - The number of variables in the boolean function
+    ///
+    /// # Returns
+    /// The best `OptimizedFor` variant for the current hardware
+    ///
+    /// # Examples
+    /// ```
+    /// use qm_agent::cnf_dnf::OptimizedFor;
+    ///
+    /// let optimization = OptimizedFor::detect_best(32);
+    /// println!("Using optimization: {:?}", optimization);
+    /// ```
+    pub fn detect_best(n_variables: usize) -> Self {
+        #[cfg(target_arch = "x86_64")]
+        {
+            // Check for AVX-512 support
+            if std::is_x86_feature_detected!("avx512f")
+                && std::is_x86_feature_detected!("avx512bw")
+            {
+                // Choose AVX-512 variant based on number of variables
+                if n_variables <= 8 {
+                    return Self::Avx512_8bits;
+                } else if n_variables <= 16 {
+                    return Self::Avx512_16bits;
+                } else if n_variables <= 32 {
+                    return Self::Avx512_32bits;
+                } else {
+                    return Self::Avx512_64bits;
+                }
+            }
+
+            // Check for AVX2 support
+            if std::is_x86_feature_detected!("avx2") && n_variables <= 64 {
+                return Self::Avx2_64bits;
+            }
+        }
+
+        // Fallback to scalar X64 (always available)
+        Self::X64
+    }
+
+    /// Returns a human-readable string representation of the optimization level
+    ///
+    /// # Examples
+    /// ```
+    /// use qm_agent::cnf_dnf::OptimizedFor;
+    ///
+    /// let opt = OptimizedFor::Avx512_16bits;
+    /// assert_eq!(opt.to_string(), "AVX-512 (16-bit)");
+    /// ```
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            Self::X64 => "X64 (scalar)",
+            Self::Avx512_64bits => "AVX-512 (64-bit)",
+            Self::Avx512_32bits => "AVX-512 (32-bit)",
+            Self::Avx512_16bits => "AVX-512 (16-bit)",
+            Self::Avx512_8bits => "AVX-512 (8-bit)",
+            Self::Avx2_64bits => "AVX2 (64-bit)",
+        }
+    }
+}
+
+impl std::fmt::Display for OptimizedFor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 /// Test if a bit is set at a given position
@@ -157,25 +233,24 @@ pub fn convert_cnf_to_dnf<T: Into<u64> + Copy>(
     result_dnf
 }
 
-/// Convert CNF to DNF and return only the minimal conjunctions
-#[allow(non_snake_case)]
+/// Convert CNF to DNF and return only the smallest disjunctions
 pub fn convert_cnf_to_dnf_minimal<T: Into<u64> + Copy>(
     cnf: &[T],
     n_bits: usize,
     of: OptimizedFor,
-    EARLY_PRUNE: bool,
+    early_prune: bool,
 ) -> Vec<u64> {
-    let result_dnf = if EARLY_PRUNE {
+    let result_dnf = if early_prune {
         convert_cnf_to_dnf_minimal_private_method1(cnf, n_bits, of)
     } else {
         convert_cnf_to_dnf(cnf, n_bits, of)
     };
 
-    // Select only the smallest DNFs
     if result_dnf.is_empty() {
         return result_dnf;
     }
 
+    // Select only the smallest DNFs
     let mut smallest_cnf_size = usize::MAX;
     for &conjunction in &result_dnf {
         let size = conjunction.count_ones() as usize;
@@ -215,7 +290,7 @@ fn convert_cnf_to_dnf_minimal_private_method1<T: Into<u64> + Copy>(
 
             for pos in 0..n_bits {
                 if test_bit(disj_val, pos) {
-                    let x = 1u64 << pos;
+                    let x = 1u64 << pos; // NOTE: x only contains one single bit set
 
                     for &y in &result_dnf {
                         let z = x | y;

@@ -1,36 +1,148 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fmt;
+use std::ops::{BitAnd, BitOr, BitXor, Not, Shl};
 
 use crate::cnf_dnf;
 use crate::cnf_dnf::OptimizedFor;
 
 // Constants
-pub const MAX_16_BITS: bool = false;
 pub const DONT_KNOW: char = 'X';
 
+/// Trait for integer types that can be used in bit operations
+pub trait BitOps:
+    Copy
+    + Eq
+    + Ord
+    + std::hash::Hash
+    + BitAnd<Output = Self>
+    + BitOr<Output = Self>
+    + BitXor<Output = Self>
+    + Not<Output = Self>
+    + Shl<usize, Output = Self>
+    + fmt::Debug
+{
+    fn from_u64(val: u64) -> Self;
+    fn to_u64(self) -> u64;
+    fn count_ones(self) -> u32;
+    fn zero() -> Self;
+    fn one() -> Self;
+
+    /// Check if bit at position `pos` is set
+    fn get_bit(self, pos: usize) -> bool;
+}
+
+impl BitOps for u32 {
+    #[inline]
+    fn from_u64(val: u64) -> Self {
+        val as u32
+    }
+    #[inline]
+    fn to_u64(self) -> u64 {
+        self as u64
+    }
+    #[inline]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
+    }
+    #[inline]
+    fn zero() -> Self {
+        0u32
+    }
+    #[inline]
+    fn one() -> Self {
+        1u32
+    }
+    #[inline]
+    fn get_bit(self, pos: usize) -> bool {
+        (self & (1u32 << pos)) != 0
+    }
+}
+
+impl BitOps for u64 {
+    #[inline]
+    fn from_u64(val: u64) -> Self {
+        val
+    }
+    #[inline]
+    fn to_u64(self) -> u64 {
+        self
+    }
+    #[inline]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
+    }
+    #[inline]
+    fn zero() -> Self {
+        0u64
+    }
+    #[inline]
+    fn one() -> Self {
+        1u64
+    }
+    #[inline]
+    fn get_bit(self, pos: usize) -> bool {
+        (self & (1u64 << pos)) != 0
+    }
+}
+
+/// Trait defining the encoding scheme for minterms
+pub trait MintermEncoding: Copy + fmt::Debug {
+    /// The integer type used for storing minterms
+    type Value: BitOps;
+
+    /// Offset for don't-care bits (16 for 16-bit mode, 32 for 32-bit mode)
+    const DK_OFFSET: usize;
+
+    /// Maximum number of variables supported
+    const MAX_VARS: usize;
+
+    /// Width of the MintermSet bucket array
+    const BUCKET_WIDTH: usize;
+}
+
+/// 16-bit encoding: uses u32, supports up to 16 variables
+#[derive(Debug, Copy, Clone)]
+pub struct Encoding16;
+
+impl MintermEncoding for Encoding16 {
+    type Value = u32;
+    const DK_OFFSET: usize = 16;
+    const MAX_VARS: usize = 16;
+    const BUCKET_WIDTH: usize = 33;
+}
+
+/// 32-bit encoding: uses u64, supports up to 32 variables
+#[derive(Debug, Copy, Clone)]
+pub struct Encoding32;
+
+impl MintermEncoding for Encoding32 {
+    type Value = u64;
+    const DK_OFFSET: usize = 32;
+    const MAX_VARS: usize = 32;
+    const BUCKET_WIDTH: usize = 65;
+}
+
 /// Convert minterm to formula string
-pub fn minterm_to_formula<T: Into<u64> + Copy>(
+pub fn minterm_to_formula<E: MintermEncoding>(
     number_vars: usize,
-    minterm: T,
+    minterm: E::Value,
     names: &[String],
 ) -> String {
-    let minterm_val: u64 = minterm.into();
     let mut result = String::new();
     let mut first = true;
 
-    let n_bits = if MAX_16_BITS { 16 } else { 32 };
-
     for i in 0..number_vars {
-        let pos = (number_vars - 1 - i) + n_bits;
+        let pos = (number_vars - 1 - i) + E::DK_OFFSET;
         let variable_name = &names[i];
 
-        if !get_bit(minterm_val, pos) {
+        if !minterm.get_bit(pos) {
             if first {
                 first = false;
             } else {
                 result.push_str(" & ");
             }
 
-            if get_bit(minterm_val, number_vars - 1 - i) {
+            if minterm.get_bit(number_vars - 1 - i) {
                 result.push_str(variable_name);
             } else {
                 result.push('~');
@@ -42,17 +154,18 @@ pub fn minterm_to_formula<T: Into<u64> + Copy>(
 }
 
 /// Convert one minterm to string representation
-pub fn minterm_to_string<T: Into<u64> + Copy>(number_vars: usize, minterm: T) -> String {
-    let minterm_val: u64 = minterm.into();
-    let dk_offset = if MAX_16_BITS { 16 } else { 32 };
+pub fn minterm_to_string<E: MintermEncoding>(
+    number_vars: usize,
+    minterm: E::Value,
+) -> String {
     let mut result = vec![DONT_KNOW; number_vars];
 
     for i in 0..number_vars {
         let pos = (number_vars - i) - 1;
-        let pos_x = pos + dk_offset;
+        let pos_x = pos + E::DK_OFFSET;
 
-        if !get_bit(minterm_val, pos_x) {
-            result[i] = if get_bit(minterm_val, pos) { '1' } else { '0' };
+        if !minterm.get_bit(pos_x) {
+            result[i] = if minterm.get_bit(pos) { '1' } else { '0' };
         }
     }
 
@@ -60,49 +173,50 @@ pub fn minterm_to_string<T: Into<u64> + Copy>(number_vars: usize, minterm: T) ->
 }
 
 /// Convert multiple minterms to multiple strings
-pub fn minterms_to_strings<T: Into<u64> + Copy>(
+pub fn minterms_to_strings<E: MintermEncoding>(
     number_vars: usize,
-    minterms: &[T],
+    minterms: &[E::Value],
 ) -> Vec<String> {
-    if number_vars > 16 {
-        eprintln!("ERROR: max number of vars is 16");
+    if number_vars > E::MAX_VARS {
+        eprintln!("ERROR: max number of vars is {}", E::MAX_VARS);
         return Vec::new();
     }
 
     minterms
         .iter()
-        .map(|&minterm| minterm_to_string(number_vars, minterm))
+        .map(|&minterm| minterm_to_string::<E>(number_vars, minterm))
         .collect()
 }
 
 /// Convert multiple minterms to single string
-pub fn minterms_to_string<T: Into<u64> + Copy>(number_vars: usize, minterms: &[T]) -> String {
-    minterms_to_strings(number_vars, minterms).join(" ")
-}
-
-/// Helper function to get bit at position
-#[inline]
-fn get_bit(value: u64, pos: usize) -> bool {
-    (value & (1u64 << pos)) != 0
+pub fn minterms_to_string<E: MintermEncoding>(
+    number_vars: usize,
+    minterms: &[E::Value],
+) -> String {
+    minterms_to_strings::<E>(number_vars, minterms).join(" ")
 }
 
 /// MintermSet structure for organizing minterms by popcount
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MintermSet {
-    data: Vec<Vec<u64>>,
+///
+/// Generic over the encoding type `E`, which determines the storage type
+/// (u32 for Encoding16, u64 for Encoding32) and bucket array size.
+#[derive(Debug, Clone)]
+pub struct MintermSet<E: MintermEncoding> {
+    data: Vec<Vec<E::Value>>,
     max_bit_count: usize,
+    _phantom: std::marker::PhantomData<E>,
 }
 
-impl MintermSet {
+impl<E: MintermEncoding> MintermSet<E> {
     pub fn new() -> Self {
-        let width = if MAX_16_BITS { 33 } else { 65 };
         Self {
-            data: vec![Vec::new(); width],
+            data: vec![Vec::new(); E::BUCKET_WIDTH],
             max_bit_count: 0,
+            _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn add(&mut self, value: u64) {
+    pub fn add(&mut self, value: E::Value) {
         let bit_count = value.count_ones() as usize;
         if bit_count > self.max_bit_count {
             self.max_bit_count = bit_count;
@@ -110,13 +224,13 @@ impl MintermSet {
         self.data[bit_count].push(value);
     }
 
-    pub fn add_all(&mut self, values: &[u64]) {
+    pub fn add_all(&mut self, values: &[E::Value]) {
         for &value in values {
             self.add(value);
         }
     }
 
-    pub fn get(&self, bit_count: usize) -> &[u64] {
+    pub fn get(&self, bit_count: usize) -> &[E::Value] {
         &self.data[bit_count]
     }
 
@@ -125,7 +239,7 @@ impl MintermSet {
     }
 }
 
-impl Default for MintermSet {
+impl<E: MintermEncoding> Default for MintermSet<E> {
     fn default() -> Self {
         Self::new()
     }
@@ -133,27 +247,30 @@ impl Default for MintermSet {
 
 /// Check if two values form a gray code pair (differ by exactly one bit)
 #[inline]
-pub fn is_gray_code(a: u64, b: u64) -> bool {
+pub fn is_gray_code<E: MintermEncoding>(a: E::Value, b: E::Value) -> bool {
     (a ^ b).count_ones() == 1
 }
 
 /// Replace complement terms with don't cares
-pub fn replace_complements(a: u64, b: u64) -> u64 {
+///
+/// The encoding type `E` determines the shift amount at compile time,
+/// allowing the compiler to generate optimal code with no branches.
+///
+/// # Type Parameters
+/// * `E` - The encoding type (Encoding16 or Encoding32) which determines
+///         both the value type (u32 or u64) and the don't-care offset
+#[inline]
+pub fn replace_complements<E: MintermEncoding>(a: E::Value, b: E::Value) -> E::Value {
     let neq = a ^ b;
-    if MAX_16_BITS {
-        a | neq | (neq << 16)
-    } else {
-        a | neq | (neq << 32)
-    }
+    a | neq | (neq << E::DK_OFFSET)
 }
 
 /// Reduce minterms using classic O(n²) algorithm
-#[allow(non_snake_case)]
-pub fn reduce_minterms_CLASSIC(
-    minterms: &[u64],
+pub fn reduce_minterms_classic<E: MintermEncoding>(
+    minterms: &[E::Value],
     n_variables: usize,
     show_info: bool,
-) -> Vec<u64> {
+) -> Vec<E::Value> {
     let mut total_comparisons = 0u64;
     let max = minterms.len();
     let mut checked = vec![false; max];
@@ -167,15 +284,15 @@ pub fn reduce_minterms_CLASSIC(
             }
 
             let term_j = minterms[j];
-            if is_gray_code(term_i, term_j) {
+            if is_gray_code::<E>(term_i, term_j) {
                 checked[i] = true;
                 checked[j] = true;
-                let new_mt = replace_complements(term_i, term_j);
+                let new_mt = replace_complements::<E>(term_i, term_j);
 
                 if show_info {
-                    println!("INFO: 09f28d3a: term_i: {}", minterm_to_string(n_variables, term_i));
-                    println!("INFO: 2d17146f: term_j: {}", minterm_to_string(n_variables, term_j));
-                    println!("INFO: 313a49ea: new_mt: {}", minterm_to_string(n_variables, new_mt));
+                    println!("INFO: 09f28d3a: term_i: {}", minterm_to_string::<E>(n_variables, term_i));
+                    println!("INFO: 2d17146f: term_j: {}", minterm_to_string::<E>(n_variables, term_j));
+                    println!("INFO: 313a49ea: new_mt: {}", minterm_to_string::<E>(n_variables, new_mt));
                 }
 
                 new_minterms.insert(new_mt);
@@ -191,7 +308,7 @@ pub fn reduce_minterms_CLASSIC(
         if !checked[i] {
             if show_info {
                 println!("INFO: 6dc50c80: adding existing minterm: {}",
-                         minterm_to_string(n_variables, minterms[i]));
+                         minterm_to_string::<E>(n_variables, minterms[i]));
             }
             new_minterms.insert(minterms[i]);
         }
@@ -200,20 +317,19 @@ pub fn reduce_minterms_CLASSIC(
     new_minterms.into_iter().collect()
 }
 
-/// Reduce minterms using optimized algorithm
-#[allow(non_snake_case)]
-pub fn reduce_minterms(minterms: &[u64], show_info: bool) -> Vec<u64> {
+/// Reduce minterms using an optimized algorithm
+pub fn reduce_minterms<E: MintermEncoding>(minterms: &[E::Value], show_info: bool) -> Vec<E::Value> {
     let mut total_comparisons = 0u64;
-    let mut set = MintermSet::new();
+    let mut set = MintermSet::<E>::new();
     set.add_all(minterms);
 
     let mut new_minterms = BTreeSet::new();
     let max_bit_count = set.get_max_bit_count();
 
-    let mut checked_X: Vec<Vec<bool>> = Vec::new();
+    let mut checked_x: Vec<Vec<bool>> = Vec::new();
     for bit_count in 0..=max_bit_count {
         let size = set.get(bit_count).len();
-        checked_X.push(vec![false; size]);
+        checked_x.push(vec![false; size]);
     }
 
     for bit_count in 0..max_bit_count {
@@ -235,15 +351,15 @@ pub fn reduce_minterms(minterms: &[u64], show_info: bool) -> Vec<u64> {
             for j in 0..max_j {
                 let term_j = minterms_j[j];
 
-                if is_gray_code(term_i, term_j) {
-                    checked_X[bit_count][i] = true;
-                    checked_X[bit_count + 1][j] = true;
-                    let new_mt = replace_complements(term_i, term_j);
+                if is_gray_code::<E>(term_i, term_j) {
+                    checked_x[bit_count][i] = true;
+                    checked_x[bit_count + 1][j] = true;
+                    let new_mt = replace_complements::<E>(term_i, term_j);
 
                     if show_info {
-                        println!("INFO: 09f28d3a: term_i: {}", minterm_to_string(3, term_i));
-                        println!("INFO: 2d17146f: term_j: {}", minterm_to_string(3, term_j));
-                        println!("INFO: 313a49ea: new_mt: {}", minterm_to_string(3, new_mt));
+                        println!("INFO: 09f28d3a: term_i: {}", minterm_to_string::<E>(3, term_i));
+                        println!("INFO: 2d17146f: term_j: {}", minterm_to_string::<E>(3, term_j));
+                        println!("INFO: 313a49ea: new_mt: {}", minterm_to_string::<E>(3, new_mt));
                     }
 
                     new_minterms.insert(new_mt);
@@ -256,10 +372,10 @@ pub fn reduce_minterms(minterms: &[u64], show_info: bool) -> Vec<u64> {
         println!("INFO: 393bb38d: total_comparisons = {}", total_comparisons);
     }
 
-    let mut result: Vec<u64> = new_minterms.into_iter().collect();
+    let mut result: Vec<E::Value> = new_minterms.into_iter().collect();
 
     for bit_count in 0..=max_bit_count {
-        let checked_i = &checked_X[bit_count];
+        let checked_i = &checked_x[bit_count];
         let minterms_i = set.get(bit_count);
 
         for i in 0..checked_i.len() {
@@ -272,10 +388,12 @@ pub fn reduce_minterms(minterms: &[u64], show_info: bool) -> Vec<u64> {
     result
 }
 
-/// Reduce minterms using optimized algorithm with early pruning
-#[allow(non_snake_case)]
-pub fn reduce_minterms_X(minterms: &[u64], _show_info: bool) -> Vec<u64> {
-    let mut set = MintermSet::new();
+/// Reduce minterms using an optimized algorithm with early pruning
+pub fn reduce_minterms_with_early_pruning<E: MintermEncoding>(
+    minterms: &[E::Value],
+    _show_info: bool,
+) -> Vec<E::Value> {
+    let mut set = MintermSet::<E>::new();
     for &minterm in minterms {
         set.add(minterm);
     }
@@ -283,10 +401,10 @@ pub fn reduce_minterms_X(minterms: &[u64], _show_info: bool) -> Vec<u64> {
     let mut new_minterms = BTreeSet::new();
     let max_bit_count = set.get_max_bit_count();
 
-    let mut checked_X: Vec<Vec<bool>> = Vec::new();
+    let mut checked_x: Vec<Vec<bool>> = Vec::new();
     for bit_count in 0..=max_bit_count {
         let size = set.get(bit_count).len();
-        checked_X.push(vec![false; size]);
+        checked_x.push(vec![false; size]);
     }
 
     for bit_count in 0..max_bit_count {
@@ -316,10 +434,11 @@ pub fn reduce_minterms_X(minterms: &[u64], _show_info: bool) -> Vec<u64> {
             for j in 0..max_j {
                 if !done[j] {
                     let term_j = minterms_j[j];
-                    if is_gray_code(term_i, term_j) {
-                        checked_X[bit_count][i] = true;
-                        checked_X[bit_count + 1][j] = true;
-                        new_minterms.insert(replace_complements(term_i, term_j));
+                    if is_gray_code::<E>(term_i, term_j) {
+                        checked_x[bit_count][i] = true;
+                        checked_x[bit_count + 1][j] = true;
+                        let new_mt = replace_complements::<E>(term_i, term_j);
+                        new_minterms.insert(new_mt);
 
                         for &k in &impossible_j[&j] {
                             done[k] = true;
@@ -332,7 +451,7 @@ pub fn reduce_minterms_X(minterms: &[u64], _show_info: bool) -> Vec<u64> {
 
     // Add unchecked minterms
     for bit_count in 0..=max_bit_count {
-        let checked_i = &checked_X[bit_count];
+        let checked_i = &checked_x[bit_count];
         let minterms_i = set.get(bit_count);
 
         for i in 0..checked_i.len() {
@@ -348,23 +467,21 @@ pub fn reduce_minterms_X(minterms: &[u64], _show_info: bool) -> Vec<u64> {
 pub mod petrick {
     use super::*;
 
-    pub type PrimeImplicant = u64;
-    pub type MinTerm = u64;
-    pub type PITable1 = BTreeMap<PrimeImplicant, HashSet<MinTerm>>;
-    pub type PITable2 = BTreeMap<MinTerm, HashSet<PrimeImplicant>>;
+    pub type PITable1<E> = BTreeMap<E, HashSet<E>>;
+    pub type PITable2<E> = BTreeMap<E, HashSet<E>>;
 
     /// Convert prime implicant to string formula
-    pub fn prime_implicant_to_string(
-        pi: PrimeImplicant,
+    pub fn prime_implicant_to_string<E: MintermEncoding>(
+        pi: E::Value,
         n_variables: usize,
         names: &[String],
     ) -> String {
         let mut result = String::new();
 
         for i in (0..n_variables).rev() {
-            if !get_bit(pi, i + 32) {
+            if !pi.get_bit(i + E::DK_OFFSET) {
                 result.push_str(&names[i]);
-                if !get_bit(pi, i) {
+                if !pi.get_bit(i) {
                     result.push('\'');
                 }
             }
@@ -374,19 +491,19 @@ pub mod petrick {
     }
 
     /// Convert multiple prime implicants to formula string
-    pub fn prime_implicants_to_string(
-        pis: &[PrimeImplicant],
+    pub fn prime_implicants_to_string<E: MintermEncoding>(
+        pis: &[E::Value],
         n_variables: usize,
         names: &[String],
     ) -> String {
         pis.iter()
-            .map(|&pi| prime_implicant_to_string(pi, n_variables, names))
+            .map(|&pi| prime_implicant_to_string::<E>(pi, n_variables, names))
             .collect::<Vec<_>>()
             .join(" + ")
     }
 
     /// Convert PITable1 to PITable2
-    pub fn convert(pi_table: &PITable1) -> PITable2 {
+    pub fn convert<E: MintermEncoding>(pi_table: &PITable1<E::Value>) -> PITable2<E::Value> {
         let mut all_minterms = BTreeSet::new();
         for (_, set) in pi_table {
             for &minterm in set {
@@ -409,18 +526,23 @@ pub mod petrick {
     }
 
     /// Create prime implicant table
-    pub fn create_prime_implicant_table(
-        prime_implicants: &[PrimeImplicant],
-        minterms: &[MinTerm],
-    ) -> PITable1 {
-        const DK_OFFSET: usize = if MAX_16_BITS { 16 } else { 32 };
-        const DATA_MASK: u64 = 0xFFFF_FFFF;
+    pub fn create_prime_implicant_table<E: MintermEncoding>(
+        prime_implicants: &[E::Value],
+        minterms: &[E::Value],
+    ) -> PITable1<E::Value> {
+        // DATA_MASK needs to match the encoding's value type
+        let data_mask = if E::DK_OFFSET == 16 {
+            E::Value::from_u64(0xFFFF)
+        } else {
+            E::Value::from_u64(0xFFFF_FFFF)
+        };
 
         let mut results = PITable1::new();
 
         for &pi in prime_implicants {
-            let dont_know = pi >> DK_OFFSET;
-            let q = (DATA_MASK & pi) | dont_know;
+            // Shift to get don't-care bits
+            let dont_know = E::Value::from_u64(pi.to_u64() >> E::DK_OFFSET);
+            let q = (data_mask & pi) | dont_know;
 
             let mut set = HashSet::new();
             for &mt in minterms {
@@ -435,7 +557,10 @@ pub mod petrick {
     }
 
     /// Convert PITable1 to string
-    pub fn to_string_pi_table1(pi_table1: &PITable1, pi_width: usize) -> String {
+    pub fn to_string_pi_table1<E: MintermEncoding>(
+        pi_table1: &PITable1<E::Value>,
+        pi_width: usize,
+    ) -> String {
         let mut all_minterms = BTreeSet::new();
         for (_, mt_set) in pi_table1 {
             for &minterm in mt_set {
@@ -445,7 +570,7 @@ pub mod petrick {
 
         let mut result = String::from("\t");
         for (pi, _) in pi_table1 {
-            result.push_str(&minterm_to_string(pi_width, *pi));
+            result.push_str(&minterm_to_string::<E>(pi_width, *pi));
             result.push(' ');
         }
         result.push('\n');
@@ -463,7 +588,7 @@ pub mod petrick {
                 }
             }
 
-            result.push_str(&minterm_to_string(pi_width, mt));
+            result.push_str(&minterm_to_string::<E>(pi_width, mt));
             if covered_by_prime_implicants == 1 {
                 result.push('*');
             }
@@ -476,7 +601,10 @@ pub mod petrick {
     }
 
     /// Convert PITable2 to string
-    pub fn to_string_pi_table2(pi_table2: &PITable2, pi_width: usize) -> String {
+    pub fn to_string_pi_table2<E: MintermEncoding>(
+        pi_table2: &PITable2<E::Value>,
+        pi_width: usize,
+    ) -> String {
         if pi_table2.is_empty() {
             return String::from("Empty");
         }
@@ -490,13 +618,13 @@ pub mod petrick {
 
         let mut result = String::from("\t");
         for &pi in &all_pi {
-            result.push_str(&minterm_to_string(pi_width, pi));
+            result.push_str(&minterm_to_string::<E>(pi_width, pi));
             result.push(' ');
         }
         result.push('\n');
 
         for (mt, pi_set) in pi_table2 {
-            result.push_str(&minterm_to_string(pi_width, *mt));
+            result.push_str(&minterm_to_string::<E>(pi_width, *mt));
             result.push_str("\t|");
             for &pi in &all_pi {
                 result.push(if pi_set.contains(&pi) { 'X' } else { '.' });
@@ -508,9 +636,9 @@ pub mod petrick {
     }
 
     /// Identify primary essential prime implicants
-    pub fn identify_primary_essential_pi2(
-        pi_table: &PITable2,
-    ) -> (PITable2, Vec<PrimeImplicant>) {
+    pub fn identify_primary_essential_pi2<E: MintermEncoding>(
+        pi_table: &PITable2<E::Value>,
+    ) -> (PITable2<E::Value>, Vec<E::Value>) {
         let mut selected_pi = HashSet::new();
 
         for (_, pi_set) in pi_table {
@@ -544,7 +672,7 @@ pub mod petrick {
     }
 
     /// Apply row dominance reduction
-    pub fn row_dominance(pi_table2: &PITable2) -> PITable2 {
+    pub fn row_dominance<E: MintermEncoding>(pi_table2: &PITable2<E::Value>) -> PITable2<E::Value> {
         let mut mt_to_be_deleted = BTreeSet::new();
 
         for (mt1, pi_set1) in pi_table2 {
@@ -566,9 +694,9 @@ pub mod petrick {
     }
 
     /// Apply column dominance reduction
-    pub fn column_dominance(pi_table2: &PITable2) -> PITable2 {
-        let pi_table1 = convert(pi_table2);
-        let all_pi: Vec<PrimeImplicant> = pi_table1.keys().copied().collect();
+    pub fn column_dominance<E: MintermEncoding>(pi_table2: &PITable2<E::Value>) -> PITable2<E::Value> {
+        let pi_table1 = convert::<E>(pi_table2);
+        let all_pi: Vec<E::Value> = pi_table1.keys().copied().collect();
         let mut pi_to_be_deleted = HashSet::new();
 
         let s = all_pi.len();
@@ -606,10 +734,13 @@ pub mod petrick {
     }
 
     /// Petrick's method using CNF to DNF conversion
-    pub fn petricks_method(pi_table2: &PITable2, show_info: bool) -> Vec<Vec<PrimeImplicant>> {
+    pub fn petricks_method<E: MintermEncoding>(
+        pi_table2: &PITable2<E::Value>,
+        show_info: bool,
+    ) -> Vec<Vec<E::Value>> {
         // Create translation maps
-        let mut translation1: HashMap<PrimeImplicant, usize> = HashMap::new();
-        let mut translation2: HashMap<usize, PrimeImplicant> = HashMap::new();
+        let mut translation1: HashMap<E::Value, usize> = HashMap::new();
+        let mut translation2: HashMap<usize, E::Value> = HashMap::new();
         let mut variable_id = 0;
 
         for (_, pi_set) in pi_table2 {
@@ -672,69 +803,69 @@ pub mod petrick {
     }
 
     /// Petrick simplification
-    pub fn petrick_simplify(
-        prime_implicants: &[PrimeImplicant],
-        minterms: &[MinTerm],
+    pub fn petrick_simplify<E: MintermEncoding>(
+        prime_implicants: &[E::Value],
+        minterms: &[E::Value],
         n_bits: usize,
         use_petrick_cnf2dnf: bool,
         show_info: bool,
-    ) -> Vec<PrimeImplicant> {
+    ) -> Vec<E::Value> {
         // 1. Create prime implicant table
-        let pi_table1 = create_prime_implicant_table(prime_implicants, minterms);
+        let pi_table1 = create_prime_implicant_table::<E>(prime_implicants, minterms);
         if show_info {
             println!("1] created PI table: number of PIs = {}", pi_table1.len());
-            println!("{}", to_string_pi_table1(&pi_table1, n_bits));
+            println!("{}", to_string_pi_table1::<E>(&pi_table1, n_bits));
         }
 
         // 2. Identify primary essential prime implicants
-        let (pi_table2, primary_essential_pi) = identify_primary_essential_pi2(&convert(&pi_table1));
+        let (pi_table2, primary_essential_pi) = identify_primary_essential_pi2::<E>(&convert::<E>(&pi_table1));
         if show_info {
             println!("2] identified primary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
                      primary_essential_pi.len(), pi_table2.len());
-            println!("{}", to_string_pi_table2(&pi_table2, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table2, n_bits));
         }
 
         // 3. Row dominance
-        let pi_table3 = row_dominance(&pi_table2);
+        let pi_table3 = row_dominance::<E>(&pi_table2);
         if show_info {
             println!("3] reduced based on row dominance: number of PIs remaining = {}", pi_table3.len());
-            println!("{}", to_string_pi_table2(&pi_table3, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table3, n_bits));
         }
 
         // 4. Column dominance
-        let pi_table4 = column_dominance(&pi_table3);
+        let pi_table4 = column_dominance::<E>(&pi_table3);
         if show_info {
             println!("4] reduced based on column dominance: number of PIs remaining = {}", pi_table4.len());
-            println!("{}", to_string_pi_table2(&pi_table4, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table4, n_bits));
         }
 
         // 5. Identify secondary essential prime implicants
-        let (pi_table5, secondary_essential_pi) = identify_primary_essential_pi2(&pi_table4);
+        let (pi_table5, secondary_essential_pi) = identify_primary_essential_pi2::<E>(&pi_table4);
         if show_info {
             println!("5] identified secondary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
                      secondary_essential_pi.len(), pi_table5.len());
-            println!("{}", to_string_pi_table2(&pi_table5, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table5, n_bits));
         }
 
         // 6. Row dominance
-        let pi_table6 = row_dominance(&pi_table5);
+        let pi_table6 = row_dominance::<E>(&pi_table5);
         if show_info {
             println!("6] reduced based on row dominance: number of PIs remaining = {}", pi_table6.len());
-            println!("{}", to_string_pi_table2(&pi_table6, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table6, n_bits));
         }
 
         // 7. Column dominance
-        let pi_table7 = column_dominance(&pi_table6);
+        let pi_table7 = column_dominance::<E>(&pi_table6);
         if show_info {
             println!("7] reduced based on column dominance: number of PIs remaining = {}", pi_table7.len());
-            println!("{}", to_string_pi_table2(&pi_table7, n_bits));
+            println!("{}", to_string_pi_table2::<E>(&pi_table7, n_bits));
         }
 
         let mut essential_pi = Vec::new();
 
         if !pi_table7.is_empty() {
             if use_petrick_cnf2dnf {
-                let pi_vector_petricks = petricks_method(&pi_table7, show_info);
+                let pi_vector_petricks = petricks_method::<E>(&pi_table7, show_info);
                 if !pi_vector_petricks.is_empty() {
                     essential_pi.extend_from_slice(&pi_vector_petricks[0]);
                 }
@@ -755,7 +886,7 @@ pub mod petrick {
         for &pi in &primary_essential_pi {
             if show_info {
                 println!("INFO: b650c460: adding primary essential PI to result: {}",
-                         minterm_to_string(n_bits, pi));
+                         minterm_to_string::<E>(n_bits, pi));
             }
             essential_pi.push(pi);
         }
@@ -763,7 +894,7 @@ pub mod petrick {
         for &pi in &secondary_essential_pi {
             if show_info {
                 println!("INFO: e2c83d65: adding secondary essential PI to result: {}",
-                         minterm_to_string(n_bits, pi));
+                         minterm_to_string::<E>(n_bits, pi));
             }
             essential_pi.push(pi);
         }
@@ -778,23 +909,23 @@ pub mod petrick {
 }
 
 /// Main Quine-McCluskey reduction function
-pub fn reduce_qm(
-    minterms_input: &[u64],
+pub fn reduce_qm<E: MintermEncoding>(
+    minterms_input: &[E::Value],
     n_variables: usize,
     use_classic_method: bool,
     use_petrick_simplify: bool,
     use_petrick_cnf2dnf: bool,
     show_info: bool,
-) -> Vec<u64> {
+) -> Vec<E::Value> {
     let mut minterms = minterms_input.to_vec();
     let mut iteration = 0;
     let mut fixed_point = false;
 
     while !fixed_point {
         let next_minterms = if use_classic_method {
-            reduce_minterms_CLASSIC(&minterms, n_variables, show_info)
+            reduce_minterms_classic::<E>(&minterms, n_variables, show_info)
         } else {
-            reduce_minterms(&minterms, show_info)
+            reduce_minterms::<E>(&minterms, show_info)
         };
 
         fixed_point = minterms == next_minterms;
@@ -802,8 +933,8 @@ pub fn reduce_qm(
         if show_info {
             println!("INFO: 361a49a4: reduce_qm: iteration {}; minterms {}; next minterms {}",
                      iteration, minterms.len(), next_minterms.len());
-            println!("INFO: 49ecfd1e: old minterms = {}", minterms_to_string(n_variables, &minterms));
-            println!("INFO: ed11b7c0: new minterms = {}", minterms_to_string(n_variables, &next_minterms));
+            println!("INFO: 49ecfd1e: old minterms = {}", minterms_to_string::<E>(n_variables, &minterms));
+            println!("INFO: ed11b7c0: new minterms = {}", minterms_to_string::<E>(n_variables, &next_minterms));
         }
 
         iteration += 1;
@@ -811,7 +942,7 @@ pub fn reduce_qm(
     }
 
     if use_petrick_simplify {
-        petrick::petrick_simplify(&minterms, minterms_input, n_variables, use_petrick_cnf2dnf, show_info)
+        petrick::petrick_simplify::<E>(&minterms, minterms_input, n_variables, use_petrick_cnf2dnf, show_info)
     } else {
         minterms
     }
@@ -822,30 +953,75 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_gray_code() {
-        assert!(is_gray_code(0b00, 0b01));
-        assert!(is_gray_code(0b01, 0b11));
-        assert!(!is_gray_code(0b00, 0b11));
+    fn test_is_gray_code_32bit() {
+        assert!(is_gray_code::<Encoding32>(0b00u64, 0b01u64));
+        assert!(is_gray_code::<Encoding32>(0b01u64, 0b11u64));
+        assert!(!is_gray_code::<Encoding32>(0b00u64, 0b11u64));
     }
 
     #[test]
-    fn test_minterm_to_string() {
-        let result = minterm_to_string(3, 0b101u64);
+    fn test_is_gray_code_16bit() {
+        assert!(is_gray_code::<Encoding16>(0b00u32, 0b01u32));
+        assert!(is_gray_code::<Encoding16>(0b01u32, 0b11u32));
+        assert!(!is_gray_code::<Encoding16>(0b00u32, 0b11u32));
+    }
+
+    #[test]
+    fn test_minterm_to_string_32bit() {
+        let result = minterm_to_string::<Encoding32>(3, 0b101u64);
         assert_eq!(result.len(), 3);
     }
 
     #[test]
-    fn test_minterm_set() {
-        let mut set = MintermSet::new();
-        set.add(0b101);
-        set.add(0b011);
+    fn test_minterm_to_string_16bit() {
+        let result = minterm_to_string::<Encoding16>(3, 0b101u32);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_minterm_set_32bit() {
+        let mut set = MintermSet::<Encoding32>::new();
+        set.add(0b101u64);
+        set.add(0b011u64);
         assert_eq!(set.get_max_bit_count(), 2);
     }
 
     #[test]
-    fn test_replace_complements() {
-        let result = replace_complements(0b0110, 0b0111);
+    fn test_minterm_set_16bit() {
+        let mut set = MintermSet::<Encoding16>::new();
+        set.add(0b101u32);
+        set.add(0b011u32);
+        assert_eq!(set.get_max_bit_count(), 2);
+    }
+
+    #[test]
+    fn test_replace_complements_32bit() {
+        let result_32 = replace_complements::<Encoding32>(0b0110u64, 0b0111u64);
         // The result should have don't care bits set in the upper half
-        assert_ne!(result, 0);
+        assert_ne!(result_32, 0);
+    }
+
+    #[test]
+    fn test_replace_complements_16bit() {
+        let result_16 = replace_complements::<Encoding16>(0b0110u32, 0b0111u32);
+        assert_ne!(result_16, 0);
+    }
+
+    #[test]
+    fn test_both_modes() {
+        // Test that both 16-bit and 32-bit modes work correctly
+        let minterms_32: Vec<u64> = vec![0b001, 0b010, 0b110, 0b111];
+        let minterms_16: Vec<u32> = vec![0b001, 0b010, 0b110, 0b111];
+
+        // 32-bit mode
+        let result_32 = reduce_minterms::<Encoding32>(&minterms_32, false);
+        assert!(!result_32.is_empty());
+
+        // 16-bit mode
+        let result_16 = reduce_minterms::<Encoding16>(&minterms_16, false);
+        assert!(!result_16.is_empty());
+
+        // Results should be the same for small problems
+        assert_eq!(result_32.len(), result_16.len());
     }
 }
