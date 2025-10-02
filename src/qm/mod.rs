@@ -17,5 +17,5 @@ pub use solver::{QMResult, QMSolver};
 // Re-export classic algorithm functions and types for backward compatibility
 pub use classic::{
     reduce_minterms, reduce_minterms_classic, reduce_minterms_with_early_pruning, reduce_qm,
-    BitOps, Encoding16, Encoding32, MintermEncoding, MintermSet,
+    BitOps, Encoding16, Encoding32, Encoding64, MintermEncoding, MintermSet,
 };

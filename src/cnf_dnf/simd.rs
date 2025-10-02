@@ -152,7 +152,7 @@ unsafe fn optimized_for_avx512_epi32_internal(result_dnf_next: &[u32], z: u32) -
 /// AVX512 optimized for 64-bit elements (8 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi64(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi64_internal(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     const NB: usize = 3; // log2(8)
     let mut index_to_delete = Vec::with_capacity(8);
 
@@ -190,7 +190,7 @@ unsafe fn optimized_for_avx512_epi64(result_dnf_next: &[u64], z: u64) -> (Vec<us
 /// AVX2 optimized for 64-bit elements (4 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
-unsafe fn optimized_for_avx2_epi64(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx2_epi64_internal(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     const NB: usize = 2; // log2(4)
     let mut index_to_delete = Vec::with_capacity(4);
 
@@ -231,7 +231,8 @@ unsafe fn optimized_for_avx2_epi64(result_dnf_next: &[u64], z: u64) -> (Vec<usiz
 #[cfg(target_arch = "x86_64")]
 pub fn run_avx512_64bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     if is_x86_feature_detected!("avx512f") {
-        unsafe { optimized_for_avx512_epi64(result_dnf_next, z) }
+        // No type conversion needed - u64 is processed natively
+        unsafe { optimized_for_avx512_epi64_internal(result_dnf_next, z) }
     } else {
         super::convert::optimized_for_x64(result_dnf_next, z)
     }
@@ -275,7 +276,8 @@ pub fn run_avx512_8bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
 #[cfg(target_arch = "x86_64")]
 pub fn run_avx2_64bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     if is_x86_feature_detected!("avx2") {
-        unsafe { optimized_for_avx2_epi64(result_dnf_next, z) }
+        // No type conversion needed - u64 is processed natively
+        unsafe { optimized_for_avx2_epi64_internal(result_dnf_next, z) }
     } else {
         super::convert::optimized_for_x64(result_dnf_next, z)
     }

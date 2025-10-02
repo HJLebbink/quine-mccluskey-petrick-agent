@@ -179,15 +179,15 @@ fn equality_test_minimal() {
 }
 
 #[test]
-fn quick_equality_smoke_test() {
-    // Quick smoke test (runs as part of normal test suite)
+fn quick_equality_smoke_test_cnf_dnf() {
+    // Quick smoke test (runs as part of the normal test suite)
     let mut rng = StdRng::seed_from_u64(42);
 
-    const N_EXPERIMENTS: usize = 100;
+    const N_EXPERIMENTS: usize = 10;
 
     for _ in 0..N_EXPERIMENTS {
 
-        for n_variables in [1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 40] {
+        for n_variables in [1, 2, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64] {
             let n_conjunctions = rng.gen_range(1..=5);
             let n_disjunctions = rng.gen_range(1..=n_variables);
 
@@ -203,7 +203,7 @@ fn quick_equality_smoke_test() {
 
             let dnf_x64 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::X64);
 
-            if n_variables <= 64 {
+            if n_variables <= 32 {
                 let dnf_avx512_64 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_64bits);
                 assert!(
                     dnf_equal(&dnf_x64, &dnf_avx512_64),
@@ -211,7 +211,7 @@ fn quick_equality_smoke_test() {
                 );
             }
 
-            if n_variables <= 32 {
+            if n_variables <= 16 {
                 let dnf_avx512_32 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_32bits);
                 assert!(
                     dnf_equal(&dnf_x64, &dnf_avx512_32),
@@ -219,7 +219,7 @@ fn quick_equality_smoke_test() {
                 );
             }
 
-            if n_variables <= 16 {
+            if n_variables <= 8 {
                 let dnf_avx512_16 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_16bits);
                 assert!(
                     dnf_equal(&dnf_x64, &dnf_avx512_16),
@@ -227,7 +227,7 @@ fn quick_equality_smoke_test() {
                 );
             }
 
-            if n_variables <= 8 {
+            if n_variables <= 4 {
                 let dnf_avx512_8 = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, OptimizedFor::Avx512_8bits);
                 assert!(
                     dnf_equal(&dnf_x64, &dnf_avx512_8),

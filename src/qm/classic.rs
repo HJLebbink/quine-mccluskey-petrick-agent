@@ -85,12 +85,39 @@ impl BitOps for u64 {
     }
 }
 
+impl BitOps for u128 {
+    #[inline]
+    fn from_u64(val: u64) -> Self {
+        val as u128
+    }
+    #[inline]
+    fn to_u64(self) -> u64 {
+        self as u64
+    }
+    #[inline]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
+    }
+    #[inline]
+    fn zero() -> Self {
+        0u128
+    }
+    #[inline]
+    fn one() -> Self {
+        1u128
+    }
+    #[inline]
+    fn get_bit(self, pos: usize) -> bool {
+        (self & (1u128 << pos)) != 0
+    }
+}
+
 /// Trait defining the encoding scheme for minterms
 pub trait MintermEncoding: Copy + fmt::Debug {
     /// The integer type used for storing minterms
     type Value: BitOps;
 
-    /// Offset for don't-care bits (16 for 16-bit mode, 32 for 32-bit mode)
+    /// Offset for don't-care bits (16 for 16-bit mode, 32 for 32-bit mode, 64 for 64-bit mode)
     const DK_OFFSET: usize;
 
     /// Maximum number of variables supported
@@ -98,6 +125,15 @@ pub trait MintermEncoding: Copy + fmt::Debug {
 
     /// Width of the MintermSet bucket array
     const BUCKET_WIDTH: usize;
+
+    /// Get the recommended OptimizedFor variant for this encoding
+    fn recommended_optimized_for() -> OptimizedFor;
+
+    /// Check if an OptimizedFor variant is compatible with this encoding
+    /// Returns true if the OptimizedFor can handle the encoding's MAX_VARS
+    fn is_compatible_with(of: OptimizedFor) -> bool {
+        of.max_bits() >= Self::MAX_VARS
+    }
 }
 
 /// 16-bit encoding: uses u32, supports up to 16 variables
@@ -109,6 +145,10 @@ impl MintermEncoding for Encoding16 {
     const DK_OFFSET: usize = 16;
     const MAX_VARS: usize = 16;
     const BUCKET_WIDTH: usize = 33;
+
+    fn recommended_optimized_for() -> OptimizedFor {
+        OptimizedFor::Avx512_16bits
+    }
 }
 
 /// 32-bit encoding: uses u64, supports up to 32 variables
@@ -120,6 +160,25 @@ impl MintermEncoding for Encoding32 {
     const DK_OFFSET: usize = 32;
     const MAX_VARS: usize = 32;
     const BUCKET_WIDTH: usize = 65;
+
+    fn recommended_optimized_for() -> OptimizedFor {
+        OptimizedFor::Avx512_32bits
+    }
+}
+
+/// 64-bit encoding: uses u128, supports up to 64 variables
+#[derive(Debug, Copy, Clone)]
+pub struct Encoding64;
+
+impl MintermEncoding for Encoding64 {
+    type Value = u128;
+    const DK_OFFSET: usize = 64;
+    const MAX_VARS: usize = 64;
+    const BUCKET_WIDTH: usize = 129;
+
+    fn recommended_optimized_for() -> OptimizedFor {
+        OptimizedFor::Avx512_64bits
+    }
 }
 
 /// Convert minterm to formula string
@@ -734,10 +793,26 @@ pub mod petrick {
     }
 
     /// Petrick's method using CNF to DNF conversion
+    ///
+    /// Note: This method is limited to at most 64 prime implicants due to the
+    /// u64-based CNF representation. The OptimizedFor parameter should match
+    /// the encoding's capability (use E::recommended_optimized_for()).
     pub fn petricks_method<E: MintermEncoding>(
         pi_table2: &PITable2<E::Value>,
+        of: OptimizedFor,
         show_info: bool,
     ) -> Vec<Vec<E::Value>> {
+        // Validate that OptimizedFor is compatible with encoding
+        if !E::is_compatible_with(of) {
+            eprintln!(
+                "ERROR: OptimizedFor {:?} (max {} bits) is incompatible with encoding (requires {} bits)",
+                of,
+                of.max_bits(),
+                E::MAX_VARS
+            );
+            return Vec::new();
+        }
+
         // Create translation maps
         let mut translation1: HashMap<E::Value, usize> = HashMap::new();
         let mut translation2: HashMap<usize, E::Value> = HashMap::new();
@@ -755,11 +830,14 @@ pub mod petrick {
 
         let n_variables = variable_id;
         if n_variables > 64 {
-            eprintln!("ERROR: too many variables ({}) for cnf_to_dnf", n_variables);
+            eprintln!(
+                "ERROR: too many prime implicants ({}) for cnf_to_dnf (max 64)",
+                n_variables
+            );
             return Vec::new();
         }
 
-        // Convert PI table to CNF
+        // Convert PI table to CNF (limited to u64 representation)
         let mut cnf: Vec<u64> = Vec::new();
         for (_, pi_set) in pi_table2 {
             let mut disjunction = 0u64;
@@ -777,7 +855,7 @@ pub mod petrick {
         let smallest_conjunctions = cnf_dnf::convert_cnf_to_dnf_minimal(
             &cnf,
             n_variables,
-            OptimizedFor::Avx512_64bits,
+            of,
             false, // EARLY_PRUNE
         );
 
@@ -803,13 +881,17 @@ pub mod petrick {
     }
 
     /// Petrick simplification
+    ///
+    /// If `of` is None, uses the encoding's recommended OptimizedFor variant.
     pub fn petrick_simplify<E: MintermEncoding>(
         prime_implicants: &[E::Value],
         minterms: &[E::Value],
         n_bits: usize,
         use_petrick_cnf2dnf: bool,
+        of: Option<OptimizedFor>,
         show_info: bool,
     ) -> Vec<E::Value> {
+        let optimized_for = of.unwrap_or_else(E::recommended_optimized_for);
         // 1. Create prime implicant table
         let pi_table1 = create_prime_implicant_table::<E>(prime_implicants, minterms);
         if show_info {
@@ -865,7 +947,7 @@ pub mod petrick {
 
         if !pi_table7.is_empty() {
             if use_petrick_cnf2dnf {
-                let pi_vector_petricks = petricks_method::<E>(&pi_table7, show_info);
+                let pi_vector_petricks = petricks_method::<E>(&pi_table7, optimized_for, show_info);
                 if !pi_vector_petricks.is_empty() {
                     essential_pi.extend_from_slice(&pi_vector_petricks[0]);
                 }
@@ -909,14 +991,39 @@ pub mod petrick {
 }
 
 /// Main Quine-McCluskey reduction function
+///
+/// If `of` is None, uses the encoding's recommended OptimizedFor variant.
+/// The OptimizedFor parameter is only used when Petrick's method with CNF-to-DNF is enabled.
 pub fn reduce_qm<E: MintermEncoding>(
     minterms_input: &[E::Value],
     n_variables: usize,
     use_classic_method: bool,
     use_petrick_simplify: bool,
     use_petrick_cnf2dnf: bool,
+    of: Option<OptimizedFor>,
     show_info: bool,
 ) -> Vec<E::Value> {
+    // Validate encoding compatibility
+    if n_variables > E::MAX_VARS {
+        eprintln!(
+            "ERROR: n_variables ({}) exceeds encoding maximum ({})",
+            n_variables,
+            E::MAX_VARS
+        );
+        return Vec::new();
+    }
+
+    // Validate OptimizedFor if provided
+    if let Some(optimized_for) = of {
+        if !E::is_compatible_with(optimized_for) {
+            eprintln!(
+                "WARNING: OptimizedFor {:?} (max {} bits) may be incompatible with {} variables",
+                optimized_for,
+                optimized_for.max_bits(),
+                n_variables
+            );
+        }
+    }
     let mut minterms = minterms_input.to_vec();
     let mut iteration = 0;
     let mut fixed_point = false;
@@ -942,7 +1049,7 @@ pub fn reduce_qm<E: MintermEncoding>(
     }
 
     if use_petrick_simplify {
-        petrick::petrick_simplify::<E>(&minterms, minterms_input, n_variables, use_petrick_cnf2dnf, show_info)
+        petrick::petrick_simplify::<E>(&minterms, minterms_input, n_variables, use_petrick_cnf2dnf, of, show_info)
     } else {
         minterms
     }
@@ -1008,6 +1115,34 @@ mod tests {
     }
 
     #[test]
+    fn test_is_gray_code_64bit() {
+        assert!(is_gray_code::<Encoding64>(0b00u128, 0b01u128));
+        assert!(is_gray_code::<Encoding64>(0b01u128, 0b11u128));
+        assert!(!is_gray_code::<Encoding64>(0b00u128, 0b11u128));
+    }
+
+    #[test]
+    fn test_minterm_to_string_64bit() {
+        let result = minterm_to_string::<Encoding64>(3, 0b101u128);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_minterm_set_64bit() {
+        let mut set = MintermSet::<Encoding64>::new();
+        set.add(0b101u128);
+        set.add(0b011u128);
+        assert_eq!(set.get_max_bit_count(), 2);
+    }
+
+    #[test]
+    fn test_replace_complements_64bit() {
+        let result_64 = replace_complements::<Encoding64>(0b0110u128, 0b0111u128);
+        // The result should have don't care bits set in the upper half
+        assert_ne!(result_64, 0);
+    }
+
+    #[test]
     fn test_both_modes() {
         // Test that both 16-bit and 32-bit modes work correctly
         let minterms_32: Vec<u64> = vec![0b001, 0b010, 0b110, 0b111];
@@ -1023,5 +1158,62 @@ mod tests {
 
         // Results should be the same for small problems
         assert_eq!(result_32.len(), result_16.len());
+    }
+
+    #[test]
+    fn test_encoding_compatibility() {
+        // Test Encoding16 compatibility
+        assert!(Encoding16::is_compatible_with(OptimizedFor::Avx512_16bits));
+        assert!(Encoding16::is_compatible_with(OptimizedFor::Avx512_32bits));
+        assert!(Encoding16::is_compatible_with(OptimizedFor::Avx512_64bits));
+        assert!(!Encoding16::is_compatible_with(OptimizedFor::Avx512_8bits));
+
+        // Test Encoding32 compatibility
+        assert!(!Encoding32::is_compatible_with(OptimizedFor::Avx512_8bits));
+        assert!(!Encoding32::is_compatible_with(OptimizedFor::Avx512_16bits));
+        assert!(Encoding32::is_compatible_with(OptimizedFor::Avx512_32bits));
+        assert!(Encoding32::is_compatible_with(OptimizedFor::Avx512_64bits));
+
+        // Test Encoding64 compatibility
+        assert!(!Encoding64::is_compatible_with(OptimizedFor::Avx512_8bits));
+        assert!(!Encoding64::is_compatible_with(OptimizedFor::Avx512_16bits));
+        assert!(!Encoding64::is_compatible_with(OptimizedFor::Avx512_32bits));
+        assert!(Encoding64::is_compatible_with(OptimizedFor::Avx512_64bits));
+    }
+
+    #[test]
+    fn test_recommended_optimized_for() {
+        // Test that each encoding recommends the correct OptimizedFor
+        assert_eq!(Encoding16::recommended_optimized_for(), OptimizedFor::Avx512_16bits);
+        assert_eq!(Encoding32::recommended_optimized_for(), OptimizedFor::Avx512_32bits);
+        assert_eq!(Encoding64::recommended_optimized_for(), OptimizedFor::Avx512_64bits);
+    }
+
+    #[test]
+    fn test_reduce_qm_validation() {
+        // Test that reduce_qm rejects too many variables
+        let minterms: Vec<u32> = vec![1, 3];
+        let result = reduce_qm::<Encoding16>(
+            &minterms,
+            20, // Exceeds MAX_VARS for Encoding16 (16)
+            false,
+            false,
+            false,
+            None,
+            false,
+        );
+        assert!(result.is_empty()); // Should return empty due to validation failure
+
+        // Test that reduce_qm accepts valid variable count
+        let result = reduce_qm::<Encoding16>(
+            &minterms,
+            8, // Within MAX_VARS for Encoding16
+            false,
+            false,
+            false,
+            None,
+            false,
+        );
+        assert!(!result.is_empty()); // Should succeed
     }
 }
