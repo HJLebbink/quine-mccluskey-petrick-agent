@@ -6,7 +6,7 @@
 // This creates a large truth table (256 entries) and demonstrates
 // the algorithm's ability to handle complex Boolean functions.
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Quine-McCluskey Example: 8-bit Parity Function ===\n");
@@ -34,8 +34,9 @@ fn main() {
     println!("Number of variables: {}", variables);
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     println!("Computing minimization (this may take a moment)...");
     let result = solver.solve();

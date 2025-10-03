@@ -3,10 +3,12 @@
 
 use std::time::Instant;
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::Enc64;
 
 fn main() {
     const N_BITS: usize = 64;
-
+    const EARLY_PRUNE: bool = true;
+    
     let cnf: Vec<u64> = vec![
         1u64 << 0 | 1u64 << 1 | 1u64 << 2 | 1u64 << 3,
         1u64 << 4 | 1u64 << 5 | 1u64 << 6 | 1u64 << 7,
@@ -44,18 +46,19 @@ fn main() {
         1u64 << 24 | 1u64 << 40 | 1u64 << 59,
         1u64 << 56 | 1u64 << 57 | 1u64 << 58 | 1u64 << 59,
     ];
-
-    println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
-
-    let of = OptimizedFor::detect_best(64);
-    println!("Optimized for = {}", of);
-
+    
     println!("Computing minimal DNF (this may take a while)...");
-    let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf_minimal(&cnf, N_BITS, of, true);
-    let duration = start.elapsed();
-
-    println!("DNF = {}", cnf_dnf::dnf_to_string(&dnf));
-    println!("Minimal DNF has {} terms", dnf.len());
-    println!("Runtime: {:?}", duration);
+    println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::X64 }>(&cnf, N_BITS, EARLY_PRUNE);
+        println!("Runtime: Enc64,X64: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS, EARLY_PRUNE);
+        println!("Runtime: Enc64,Avx512_64bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
 }

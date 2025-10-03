@@ -10,7 +10,7 @@
 // - WM: Workforce Motivation
 // - LP: Labor Productivity
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Quine-McCluskey Example: Krook QCA Dataset ===\n");
@@ -47,8 +47,9 @@ fn main() {
     }
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     let result = solver.solve();
 

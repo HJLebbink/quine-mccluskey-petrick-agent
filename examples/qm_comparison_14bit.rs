@@ -6,7 +6,7 @@
 // WARNING: This example takes significant time to run (10-15 seconds or more)
 // It demonstrates the algorithm's capability on large practical problems
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 use std::collections::HashSet;
 
 fn main() {
@@ -36,8 +36,9 @@ fn main() {
     println!("Number of variables: {}", variables);
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     println!("Starting minimization...");
     println!("(This will take approximately 10-15 seconds)");

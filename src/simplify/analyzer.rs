@@ -60,22 +60,22 @@ pub fn evaluate_with_ints(
         }
         // Comparison operators
         BoolExpr::Equals(var, value) => {
-            int_assignments.get(var).map_or(false, |v| v == value)
+            int_assignments.get(var) == Some(value)
         }
         BoolExpr::NotEquals(var, value) => {
-            int_assignments.get(var).map_or(true, |v| v != value)
+            int_assignments.get(var) != Some(value)
         }
         BoolExpr::LessThan(var, value) => {
-            int_assignments.get(var).map_or(false, |v| v < value)
+            int_assignments.get(var).is_some_and(|v| v < value)
         }
         BoolExpr::LessOrEqual(var, value) => {
-            int_assignments.get(var).map_or(false, |v| v <= value)
+            int_assignments.get(var).is_some_and(|v| v <= value)
         }
         BoolExpr::GreaterThan(var, value) => {
-            int_assignments.get(var).map_or(false, |v| v > value)
+            int_assignments.get(var).is_some_and(|v| v > value)
         }
         BoolExpr::GreaterOrEqual(var, value) => {
-            int_assignments.get(var).map_or(false, |v| v >= value)
+            int_assignments.get(var).is_some_and(|v| v >= value)
         }
     }
 }
@@ -136,13 +136,13 @@ pub fn build_truth_table(branch_set: &BranchSet) -> Result<TruthTable, String> {
         // If no branch matched, use default or mark as don't care
         match output {
             Some(out) => {
-                output_groups.entry(out).or_insert_with(Vec::new).push(minterm);
+                output_groups.entry(out).or_default().push(minterm);
             }
             None => {
                 if let Some(ref default) = branch_set.default_output {
                     output_groups
                         .entry(default.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(minterm);
                 } else {
                     dont_cares.push(minterm);
@@ -221,7 +221,7 @@ mod tests {
             "1",
         );
         branch_set.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::not(BoolExpr::var("b"))),
+            BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",
         );
         branch_set.set_default("0");

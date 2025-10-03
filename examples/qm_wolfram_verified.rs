@@ -17,7 +17,7 @@
 // Also equivalent to:
 // 00X1 X011 X101 10X0
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Quine-McCluskey Example: Wolfram Alpha Verified ===\n");
@@ -41,8 +41,9 @@ fn main() {
     }
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     let result = solver.solve();
 

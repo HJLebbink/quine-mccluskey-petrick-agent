@@ -1,16 +1,20 @@
-// Benchmark to measure performance difference between MAX_16_BITS = true vs false
+// Benchmark to compare performance across different encoding types
+//
+// This benchmark compares Encoding16 (u32), Encoding32 (u64), and Encoding64 (u128)
+// across various QM algorithm operations.
 //
 // To run these benchmarks:
-// 1. Set MAX_16_BITS = false in src/qm/classic.rs (current default)
-// 2. cargo bench --bench max_16_bits_bench > results_32bit.txt
-// 3. Set MAX_16_BITS = true in src/qm/classic.rs
-// 4. cargo bench --bench max_16_bits_bench > results_16bit.txt
-// 5. Compare the results
+// cargo bench --bench encoding_bench
+//
+// To run specific encoding benchmarks:
+// cargo bench --bench encoding_bench -- reduce_minterms_16bit
+// cargo bench --bench encoding_bench -- reduce_minterms_32bit
+// cargo bench --bench encoding_bench -- reduce_minterms_64bit
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use qm_agent::qm::classic::{
     reduce_minterms, reduce_minterms_classic, minterms_to_string, minterm_to_string, MintermSet,
-    Encoding16, Encoding32,
+    Enc16, Enc32, Enc64,
 };
 
 /// Generate minterms for a given number of variables
@@ -43,7 +47,7 @@ fn bench_reduce_minterms_32bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    reduce_minterms::<Encoding32>(black_box(minterms), false)
+                    reduce_minterms::<Enc32>(black_box(minterms), false)
                 })
             },
         );
@@ -66,7 +70,7 @@ fn bench_reduce_minterms_16bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    reduce_minterms::<Encoding16>(black_box(minterms), false)
+                    reduce_minterms::<Enc16>(black_box(minterms), false)
                 })
             },
         );
@@ -90,7 +94,7 @@ fn bench_reduce_minterms_classic_32bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    reduce_minterms_classic::<Encoding32>(black_box(minterms), *n_vars, false)
+                    reduce_minterms_classic::<Enc32>(black_box(minterms), *n_vars, false)
                 })
             },
         );
@@ -114,7 +118,7 @@ fn bench_reduce_minterms_classic_16bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    reduce_minterms_classic::<Encoding16>(black_box(minterms), *n_vars, false)
+                    reduce_minterms_classic::<Enc16>(black_box(minterms), *n_vars, false)
                 })
             },
         );
@@ -135,7 +139,7 @@ fn bench_minterm_to_string_32bit(c: &mut Criterion) {
             n_vars,
             |b, &n_vars| {
                 b.iter(|| {
-                    minterm_to_string::<Encoding32>(black_box(n_vars), black_box(minterm))
+                    minterm_to_string::<Enc32>(black_box(n_vars), black_box(minterm))
                 })
             },
         );
@@ -156,7 +160,7 @@ fn bench_minterm_to_string_16bit(c: &mut Criterion) {
             n_vars,
             |b, &n_vars| {
                 b.iter(|| {
-                    minterm_to_string::<Encoding16>(black_box(n_vars), black_box(minterm))
+                    minterm_to_string::<Enc16>(black_box(n_vars), black_box(minterm))
                 })
             },
         );
@@ -179,7 +183,7 @@ fn bench_minterms_to_string_32bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    minterms_to_string::<Encoding32>(black_box(*n_vars), black_box(minterms))
+                    minterms_to_string::<Enc32>(black_box(*n_vars), black_box(minterms))
                 })
             },
         );
@@ -202,7 +206,7 @@ fn bench_minterms_to_string_16bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    minterms_to_string::<Encoding16>(black_box(*n_vars), black_box(minterms))
+                    minterms_to_string::<Enc16>(black_box(*n_vars), black_box(minterms))
                 })
             },
         );
@@ -225,7 +229,7 @@ fn bench_minterm_set_32bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    let mut set = MintermSet::<Encoding32>::new();
+                    let mut set = MintermSet::<Enc32>::new();
                     set.add_all(black_box(minterms));
                     set
                 })
@@ -250,7 +254,7 @@ fn bench_minterm_set_16bit(c: &mut Criterion) {
             &minterms,
             |b, minterms| {
                 b.iter(|| {
-                    let mut set = MintermSet::<Encoding16>::new();
+                    let mut set = MintermSet::<Enc16>::new();
                     set.add_all(black_box(minterms));
                     set
                 })
@@ -267,7 +271,7 @@ fn bench_minterm_set_get_32bit(c: &mut Criterion) {
 
     for n_vars in [4, 8, 12, 16].iter() {
         let minterms: Vec<u64> = generate_minterms(*n_vars);
-        let mut set = MintermSet::<Encoding32>::new();
+        let mut set = MintermSet::<Enc32>::new();
         set.add_all(&minterms);
         let max_bit_count = set.get_max_bit_count();
 
@@ -295,7 +299,7 @@ fn bench_minterm_set_get_16bit(c: &mut Criterion) {
 
     for n_vars in [4, 8, 12, 16].iter() {
         let minterms: Vec<u32> = generate_minterms(*n_vars).into_iter().map(|x| x as u32).collect();
-        let mut set = MintermSet::<Encoding16>::new();
+        let mut set = MintermSet::<Enc16>::new();
         set.add_all(&minterms);
         let max_bit_count = set.get_max_bit_count();
 
@@ -335,7 +339,7 @@ fn bench_full_reduction_32bit(c: &mut Criterion) {
                     let mut current = minterms.clone();
                     let mut iteration = 0;
                     loop {
-                        let next = reduce_minterms::<Encoding32>(black_box(&current), false);
+                        let next = reduce_minterms::<Enc32>(black_box(&current), false);
                         iteration += 1;
                         if current == next || iteration > 100 {
                             break;
@@ -369,7 +373,185 @@ fn bench_full_reduction_16bit(c: &mut Criterion) {
                     let mut current = minterms.clone();
                     let mut iteration = 0;
                     loop {
-                        let next = reduce_minterms::<Encoding16>(black_box(&current), false);
+                        let next = reduce_minterms::<Enc16>(black_box(&current), false);
+                        iteration += 1;
+                        if current == next || iteration > 100 {
+                            break;
+                        }
+                        current = next;
+                    }
+                    current
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark the core reduction algorithm - 64-bit mode
+fn bench_reduce_minterms_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("reduce_minterms_64bit");
+
+    for n_vars in [4, 8, 10, 12, 14, 16, 20, 24, 28, 32].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let size = minterms.len();
+
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("optimized_64bit", format!("{}_vars_{}_terms", n_vars, size)),
+            &minterms,
+            |b, minterms| {
+                b.iter(|| {
+                    reduce_minterms::<Enc64>(black_box(minterms), false)
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark the classic O(n²) algorithm - 64-bit mode
+fn bench_reduce_minterms_classic_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("reduce_minterms_classic_64bit");
+
+    // Only test smaller sizes for classic algorithm (it's O(n²))
+    for n_vars in [4, 6, 8, 10].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let size = minterms.len();
+
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("classic_64bit", format!("{}_vars_{}_terms", n_vars, size)),
+            &minterms,
+            |b, minterms| {
+                b.iter(|| {
+                    reduce_minterms_classic::<Enc64>(black_box(minterms), *n_vars, false)
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark minterm to string conversion - 64-bit mode
+fn bench_minterm_to_string_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minterm_to_string_64bit");
+
+    for n_vars in [4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64].iter() {
+        let minterm: u128 = 0b10101010_10101010_10101010_10101010_10101010_10101010_10101010_10101010u128;
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(format!("{}_vars", n_vars)),
+            n_vars,
+            |b, &n_vars| {
+                b.iter(|| {
+                    minterm_to_string::<Enc64>(black_box(n_vars), black_box(minterm))
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark minterms to string - 64-bit mode
+fn bench_minterms_to_string_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minterms_to_string_64bit");
+
+    for n_vars in [4, 8, 12, 16, 20, 24].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let size = minterms.len();
+
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("batch_64bit", format!("{}_vars_{}_terms", n_vars, size)),
+            &minterms,
+            |b, minterms| {
+                b.iter(|| {
+                    minterms_to_string::<Enc64>(black_box(*n_vars), black_box(minterms))
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark MintermSet operations - 64-bit mode
+fn bench_minterm_set_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minterm_set_64bit");
+
+    for n_vars in [4, 8, 12, 16, 20, 24].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let size = minterms.len();
+
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("add_all_64bit", format!("{}_vars_{}_terms", n_vars, size)),
+            &minterms,
+            |b, minterms| {
+                b.iter(|| {
+                    let mut set = MintermSet::<Enc64>::new();
+                    set.add_all(black_box(minterms));
+                    set
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark MintermSet retrieval - 64-bit mode
+fn bench_minterm_set_get_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minterm_set_get_64bit");
+
+    for n_vars in [4, 8, 12, 16, 20, 24].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let mut set = MintermSet::<Enc64>::new();
+        set.add_all(&minterms);
+        let max_bit_count = set.get_max_bit_count();
+
+        group.bench_with_input(
+            BenchmarkId::new("iterate_64bit", format!("{}_vars", n_vars)),
+            &(set, max_bit_count),
+            |b, (set, max_bit_count)| {
+                b.iter(|| {
+                    let mut total = 0;
+                    for bit_count in 0..=*max_bit_count {
+                        total += set.get(black_box(bit_count)).len();
+                    }
+                    total
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Full end-to-end benchmark - 64-bit mode
+fn bench_full_reduction_64bit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("full_reduction_64bit");
+    group.sample_size(20); // Fewer samples for longer benchmarks
+
+    for n_vars in [4, 6, 8, 10, 12, 14].iter() {
+        let minterms: Vec<u128> = generate_minterms(*n_vars).into_iter().map(|x| x as u128).collect();
+        let size = minterms.len();
+
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("until_fixed_point_64bit", format!("{}_vars_{}_terms", n_vars, size)),
+            &minterms,
+            |b, minterms| {
+                b.iter(|| {
+                    let mut current = minterms.clone();
+                    let mut iteration = 0;
+                    loop {
+                        let next = reduce_minterms::<Enc64>(black_box(&current), false);
                         iteration += 1;
                         if current == next || iteration > 100 {
                             break;
@@ -387,19 +569,26 @@ fn bench_full_reduction_16bit(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_reduce_minterms_32bit,
     bench_reduce_minterms_16bit,
-    bench_reduce_minterms_classic_32bit,
+    bench_reduce_minterms_32bit,
+    bench_reduce_minterms_64bit,
     bench_reduce_minterms_classic_16bit,
-    bench_minterm_to_string_32bit,
+    bench_reduce_minterms_classic_32bit,
+    bench_reduce_minterms_classic_64bit,
     bench_minterm_to_string_16bit,
-    bench_minterms_to_string_32bit,
+    bench_minterm_to_string_32bit,
+    bench_minterm_to_string_64bit,
     bench_minterms_to_string_16bit,
-    bench_minterm_set_32bit,
+    bench_minterms_to_string_32bit,
+    bench_minterms_to_string_64bit,
     bench_minterm_set_16bit,
-    bench_minterm_set_get_32bit,
+    bench_minterm_set_32bit,
+    bench_minterm_set_64bit,
     bench_minterm_set_get_16bit,
-    bench_full_reduction_32bit,
+    bench_minterm_set_get_32bit,
+    bench_minterm_set_get_64bit,
     bench_full_reduction_16bit,
+    bench_full_reduction_32bit,
+    bench_full_reduction_64bit,
 );
 criterion_main!(benches);

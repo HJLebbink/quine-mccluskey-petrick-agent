@@ -1,6 +1,7 @@
 // Random CNF generation test: 20 conjunctions, 32 bits, 8 disjunctions per conjunction
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::Enc32;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::Instant;
 
@@ -14,18 +15,28 @@ fn main() {
     for _ in 0..N_CONJUNCTIONS {
         let mut conjunction = 0u64;
         for _ in 0..N_DISJUNCTIONS {
-            let r = rng.gen_range(0..N_BITS);
+            let r = rng.random_range(0..N_BITS);
             conjunction |= 1u64 << r;
         }
         cnf.push(conjunction);
     }
-
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
-
-    let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf(&cnf, N_BITS, OptimizedFor::X64);
-    let duration = start.elapsed();
-
-    println!("DNF = {}", cnf_dnf::dnf_to_string(&dnf));
-    println!("Runtime: {:?}", duration);
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::X64 }>(&cnf, N_BITS);
+        println!("Runtime: Enc32,X64: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_32bits }>(&cnf, N_BITS);
+        println!("Runtime: Enc32,Avx512_32bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS);
+        println!("Runtime: Enc32,Avx512_64bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
 }

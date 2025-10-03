@@ -17,7 +17,7 @@
 // Expected result: X0X0 X1X1 XX10 1XX0
 // Which means: (B'D') + (BD) + (CD') + (AD')
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Quine-McCluskey Example: Has Essential Prime Implicants ===\n");
@@ -29,8 +29,9 @@ fn main() {
     println!("Number of variables: {}", variables);
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     let result = solver.solve();
 

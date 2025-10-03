@@ -20,7 +20,7 @@
 //!     "1"
 //! );
 //! branches.add_branch(
-//!     BoolExpr::and(BoolExpr::var("a"), BoolExpr::not(BoolExpr::var("b"))),
+//!     BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
 //!     "1"
 //! );
 //! branches.set_default("0");
@@ -139,7 +139,7 @@ mod tests {
             "1",
         );
         branches.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::not(BoolExpr::var("b"))),
+            BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",
         );
         branches.set_default("0");

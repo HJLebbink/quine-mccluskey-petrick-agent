@@ -13,7 +13,7 @@
 // This represents the Boolean function: f(A,B,C) = Σ(3,4,5,6,7)
 // Output is 1 when the decimal value > 2
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Simple 3-bit Quine-McCluskey Example ===\n");
@@ -37,8 +37,9 @@ fn main() {
     }
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     let result = solver.solve();
 

@@ -101,14 +101,14 @@ pub fn build_truth_table_with_comparisons(
             Some(out) => {
                 output_groups
                     .entry(out)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(minterm_idx);
             }
             None => {
                 if let Some(ref default) = branch_set.default_output {
                     output_groups
                         .entry(default.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(minterm_idx);
                 } else {
                     dont_cares.push(minterm_idx);

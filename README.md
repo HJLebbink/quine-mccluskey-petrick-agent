@@ -175,7 +175,7 @@ truth table: 00110110
 - Convenience functions for common operations (parsing, variable name generation)
 
 **QM Solver Module** (`src/qm_solver/`):
-- `quine_mccluskey.rs`: Core QM algorithm implementation with `DummyImplicant` and `BitState` types
+- `quine_mccluskey.rs`: Core QM algorithm implementation with `Implicant` and `BitState` types
 - `petricks_method.rs`: Implementation of Petrick's method for finding minimal covers
 - `utils.rs`: Utility functions for the QM algorithm
 - `mod.rs`: Module interface and `QMSolver` orchestration
@@ -235,23 +235,23 @@ The CNF to DNF conversion includes SIMD-optimized implementations using AVX2 and
 #### Key Findings
 
 1. **Small Problems (< 16 variables)**:
-   - Scalar implementation is **fastest**
-   - SIMD overhead (setup, data movement) exceeds benefits
+   - Scalar implementation often **fastest** due to SIMD overhead
+   - SIMD overhead (setup, data movement) can exceed benefits
    - Typical time: 600-900 nanoseconds
-   - **Recommendation**: Use `OptimizedFor::X64`
+   - **Recommendation**: Use `Encoding16` (auto-selects optimal strategy)
 
 2. **Medium Problems (16-32 variables)**:
    - Break-even point around 16 variables
    - SIMD shows dramatic gains at 32 variables (301x speedup)
    - Performance depends heavily on problem structure
-   - **Recommendation**: Use AVX512 variant matching bit width
+   - **Recommendation**: Use `Encoding32` (auto-selects AVX512_32bits)
 
 3. **Large Problems (64 variables)**:
    - Clear SIMD advantages
    - AVX512: 4.0x speedup (395ms → 98ms)
    - AVX2: 2.8x speedup (395ms → 143ms)
    - Speedup scales with elements per vector (4 for AVX2, 8 for AVX512)
-   - **Recommendation**: Use `OptimizedFor::Avx512_64bits` or `Avx2_64bits`
+   - **Recommendation**: Use `Encoding64` (auto-selects AVX512_64bits)
 
 4. **Early Pruning Optimization**:
    - Provides consistent **30% speedup** for minimal DNF computation
@@ -273,19 +273,28 @@ The CNF to DNF conversion includes SIMD-optimized implementations using AVX2 and
 - Automatic fallback to scalar if SIMD not available
 - Runtime CPU feature detection (no recompilation needed)
 
-#### Optimization Selection Guide
+#### Encoding Selection Guide
+
+The new encoding-aware API automatically selects the optimal SIMD strategy:
 
 ```rust
-use qm_agent::cnf_to_dnf::OptimizedFor;
+use qm_agent::cnf_dnf::convert_cnf_to_dnf_encoding;
+use qm_agent::qm::{Encoding16, Encoding32, Encoding64};
 
-let opt_level = match n_variables {
-    0..=15  => OptimizedFor::X64,              // Scalar fastest
-    16      => OptimizedFor::Avx512_16bits,    // Match bit width
-    17..=32 => OptimizedFor::Avx512_32bits,    // Dramatic speedup
-    33..=64 => OptimizedFor::Avx512_64bits,    // Maximum performance
-    _       => OptimizedFor::X64,              // Fallback
-};
+// Select encoding based on variable count
+// Each encoding validates capacity and auto-selects SIMD optimization
+match n_variables {
+    0..=16  => convert_cnf_to_dnf_encoding::<Encoding16>(&cnf, n_variables),
+    17..=32 => convert_cnf_to_dnf_encoding::<Encoding32>(&cnf, n_variables),
+    33..=64 => convert_cnf_to_dnf_encoding::<Encoding64>(&cnf, n_variables),
+    _       => panic!("Maximum 64 variables supported"),
+}
 ```
+
+**Benefits**:
+- Type-safe: Encoding validates variable count at runtime
+- Automatic: No manual SIMD optimization selection needed
+- Simple: One parameter instead of two
 
 See [`benches/README.md`](benches/README.md) for detailed documentation and [`benches/RESULTS.md`](benches/RESULTS.md) for complete benchmark results.
 

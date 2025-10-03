@@ -1,24 +1,20 @@
-use crate::qm::algorithm::{BitState, DummyImplicant, QuineMcCluskey};
-use crate::qm::petricks::PetricksMethod;
+//! QMSolver: High-level solver interface for Quine-McCluskey minimization
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct QMResult {
-    pub minimized_expression: String,
-    pub prime_implicants: Vec<String>,
-    pub essential_prime_implicants: Vec<String>,
-    pub solution_steps: Vec<String>,
-    pub cost_original: usize,
-    pub cost_minimized: usize,
-}
+use super::encoding::MintermEncoding;
+use super::implicant::{BitState, Implicant};
+use super::petricks_method::PetricksMethod;
+use super::qm_result::QMResult;
+use super::quine_mccluskey::QuineMcCluskey;
 
-pub struct QMSolver {
+/// High-level solver for Quine-McCluskey Boolean minimization
+pub struct QMSolver<E: MintermEncoding> {
     variables: usize,
-    minterms: Vec<u32>,
-    dont_cares: Vec<u32>,
+    minterms: Vec<E::Value>,
+    dont_cares: Vec<E::Value>,
     variable_names: Vec<String>,
 }
 
-impl QMSolver {
+impl<E: MintermEncoding> QMSolver<E> {
     pub fn new(variables: usize) -> Self {
         let variable_names = (0..variables)
             .map(|i| ((b'A' + i as u8) as char).to_string())
@@ -41,23 +37,23 @@ impl QMSolver {
         }
     }
 
-    pub fn set_minterms(&mut self, minterms: &[u32]) {
+    pub fn set_minterms(&mut self, minterms: &[E::Value]) {
         self.minterms = minterms.to_vec();
     }
 
-    pub fn set_dont_cares(&mut self, dont_cares: &[u32]) {
+    pub fn set_dont_cares(&mut self, dont_cares: &[E::Value]) {
         self.dont_cares = dont_cares.to_vec();
     }
 
     pub fn solve(&self) -> QMResult {
-        let mut qm = QuineMcCluskey::new(self.variables);
+        let mut qm = QuineMcCluskey::<E>::new(self.variables);
         qm.set_minterms(&self.minterms);
         qm.set_dont_cares(&self.dont_cares);
 
         let prime_implicants = qm.find_prime_implicants();
         let essential_pis = qm.find_essential_prime_implicants();
 
-        let petricks = PetricksMethod::new(&prime_implicants, &self.minterms);
+        let petricks = PetricksMethod::<E>::new(&prime_implicants, &self.minterms);
         let minimal_cover = petricks.find_minimal_cover();
 
         let minimized_expression = self.format_expression(&minimal_cover);
@@ -73,7 +69,7 @@ impl QMSolver {
         }
     }
 
-    fn format_expression(&self, implicants: &[DummyImplicant]) -> String {
+    fn format_expression(&self, implicants: &[Implicant<E>]) -> String {
         if implicants.is_empty() {
             return "0".to_string();
         }
@@ -84,7 +80,7 @@ impl QMSolver {
             .join(" + ")
     }
 
-    fn format_single_implicant(&self, implicant: &DummyImplicant) -> String {
+    fn format_single_implicant(&self, implicant: &Implicant<E>) -> String {
         let mut result = String::new();
         for i in 0..self.variables {
             match implicant.get_bit(i) {
@@ -100,7 +96,7 @@ impl QMSolver {
         }
     }
 
-    fn format_implicants(&self, implicants: &[DummyImplicant]) -> Vec<String> {
+    fn format_implicants(&self, implicants: &[Implicant<E>]) -> Vec<String> {
         implicants.iter()
             .map(|imp| self.format_single_implicant(imp))
             .collect()

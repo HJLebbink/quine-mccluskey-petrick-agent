@@ -1,14 +1,15 @@
-// Benchmark comparing different SIMD optimization levels for CNF to DNF conversion
+// Benchmark comparing different encodings for CNF to DNF conversion
 //
 // This benchmark compares:
-// - X64 (scalar baseline)
-// - AVX2 64-bit
-// - AVX512 8-bit, 16-bit, 32-bit, 64-bit
+// - Encoding16 (auto-selects Avx512_16bits)
+// - Encoding32 (auto-selects Avx512_32bits)
+// - Encoding64 (auto-selects Avx512_64bits)
 //
 // Tests are run with different problem sizes and patterns to show scaling behavior
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use qm_agent::cnf_dnf::{convert_cnf_to_dnf, convert_cnf_to_dnf_minimal, OptimizedFor};
+use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::{Enc16, Enc32, Enc64};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// Generate a random CNF formula for benchmarking
@@ -24,7 +25,7 @@ fn generate_random_cnf(
     for _ in 0..n_conjunctions {
         let mut conjunction = 0u64;
         for _ in 0..literals_per_conjunction {
-            let var = rng.gen_range(0..n_variables);
+            let var = rng.random_range(0..n_variables);
             conjunction |= 1u64 << var;
         }
         cnf.push(conjunction);
@@ -33,30 +34,34 @@ fn generate_random_cnf(
     cnf
 }
 
-/// Benchmark CNF to DNF conversion with different optimization levels
-fn bench_optimization_levels(c: &mut Criterion) {
-    let mut group = c.benchmark_group("optimization_levels");
+/// Benchmark CNF to DNF conversion with different encodings
+fn bench_encoding_types(c: &mut Criterion) {
+    let mut group = c.benchmark_group("encoding_types");
 
     // Small problem: 8 variables, 5 conjunctions, 3 literals each
     let cnf_small = generate_random_cnf(8, 5, 3, 42);
     group.throughput(Throughput::Elements(cnf_small.len() as u64));
 
-    let optimization_levels = vec![
-        ("X64", OptimizedFor::X64),
-        ("AVX2_64bits", OptimizedFor::Avx2_64bits),
-        ("AVX512_8bits", OptimizedFor::Avx512_8bits),
-        ("AVX512_16bits", OptimizedFor::Avx512_16bits),
-        ("AVX512_32bits", OptimizedFor::Avx512_32bits),
-        ("AVX512_64bits", OptimizedFor::Avx512_64bits),
-    ];
-
-    for (name, opt_level) in optimization_levels {
-        group.bench_with_input(BenchmarkId::new("small", name), &opt_level, |b, &opt| {
-            b.iter(|| {
-                convert_cnf_to_dnf(black_box(&cnf_small), black_box(8), black_box(opt))
-            });
+    // Test Encoding16 (auto-selects Avx512_16bits)
+    group.bench_function("Encoding16", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(black_box(&cnf_small), black_box(8))
         });
-    }
+    });
+
+    // Test Encoding32 (auto-selects Avx512_32bits)
+    group.bench_function("Encoding32", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(black_box(&cnf_small), black_box(8))
+        });
+    });
+
+    // Test Encoding64 (auto-selects Avx512_64bits)
+    group.bench_function("Encoding64", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(black_box(&cnf_small), black_box(8))
+        });
+    });
 
     group.finish();
 }
@@ -75,27 +80,26 @@ fn bench_problem_sizes(c: &mut Criterion) {
         let cnf = generate_random_cnf(n_vars, n_conj, literals, 42);
         group.throughput(Throughput::Elements(cnf.len() as u64));
 
-        // Test X64 baseline
-        group.bench_with_input(BenchmarkId::new("X64", name), &cnf, |b, cnf| {
-            b.iter(|| {
-                convert_cnf_to_dnf(black_box(cnf), black_box(n_vars), black_box(OptimizedFor::X64))
+        // Test with appropriate encoding for the problem size
+        if n_vars <= 16 {
+            group.bench_with_input(BenchmarkId::new("Encoding16", name), &cnf, |b, cnf| {
+                b.iter(|| {
+                    cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(black_box(cnf), black_box(n_vars))
+                });
             });
-        });
+        }
 
-        // Test best AVX512 for this size
-        let opt_level = if n_vars <= 8 {
-            OptimizedFor::Avx512_8bits
-        } else if n_vars <= 16 {
-            OptimizedFor::Avx512_16bits
-        } else if n_vars <= 32 {
-            OptimizedFor::Avx512_32bits
-        } else {
-            OptimizedFor::Avx512_64bits
-        };
+        if n_vars <= 32 {
+            group.bench_with_input(BenchmarkId::new("Encoding32", name), &cnf, |b, cnf| {
+                b.iter(|| {
+                    cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(black_box(cnf), black_box(n_vars))
+                });
+            });
+        }
 
-        group.bench_with_input(BenchmarkId::new("AVX512_optimal", name), &cnf, |b, cnf| {
+        group.bench_with_input(BenchmarkId::new("Encoding64", name), &cnf, |b, cnf| {
             b.iter(|| {
-                convert_cnf_to_dnf(black_box(cnf), black_box(n_vars), black_box(opt_level))
+                cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(black_box(cnf), black_box(n_vars))
             });
         });
     }
@@ -103,28 +107,37 @@ fn bench_problem_sizes(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark AVX512 variants with matching bit widths
-fn bench_avx512_variants(c: &mut Criterion) {
-    let mut group = c.benchmark_group("avx512_variants");
+/// Benchmark different encodings with matching problem sizes
+fn bench_encoding_variants(c: &mut Criterion) {
+    let mut group = c.benchmark_group("encoding_variants");
 
-    // Test each AVX512 variant with appropriate problem size
-    let test_cases = vec![
-        ("8bit_8vars", 8, 6, 3, OptimizedFor::Avx512_8bits),
-        ("16bit_16vars", 16, 6, 4, OptimizedFor::Avx512_16bits),
-        ("32bit_32vars", 32, 6, 5, OptimizedFor::Avx512_32bits),
-        ("64bit_64vars", 64, 6, 6, OptimizedFor::Avx512_64bits),
-    ];
-
-    for (name, n_vars, n_conj, literals, opt_level) in test_cases {
-        let cnf = generate_random_cnf(n_vars, n_conj, literals, 42);
-        group.throughput(Throughput::Elements(cnf.len() as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(name), &cnf, |b, cnf| {
-            b.iter(|| {
-                convert_cnf_to_dnf(black_box(cnf), black_box(n_vars), black_box(opt_level))
-            });
+    // Test each encoding with appropriate problem size
+    // Encoding16: 16 variables
+    let cnf_16 = generate_random_cnf(16, 6, 4, 42);
+    group.throughput(Throughput::Elements(cnf_16.len() as u64));
+    group.bench_function("Encoding16_16vars", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(black_box(&cnf_16), black_box(16))
         });
-    }
+    });
+
+    // Encoding32: 32 variables
+    let cnf_32 = generate_random_cnf(32, 6, 5, 42);
+    group.throughput(Throughput::Elements(cnf_32.len() as u64));
+    group.bench_function("Encoding32_32vars", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(black_box(&cnf_32), black_box(32))
+        });
+    });
+
+    // Encoding64: 64 variables
+    let cnf_64 = generate_random_cnf(64, 6, 6, 42);
+    group.throughput(Throughput::Elements(cnf_64.len() as u64));
+    group.bench_function("Encoding64_64vars", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(black_box(&cnf_64), black_box(64))
+        });
+    });
 
     group.finish();
 }
@@ -139,10 +152,9 @@ fn bench_minimal_with_pruning(c: &mut Criterion) {
     // Without early pruning
     group.bench_function("without_pruning", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf_minimal(
+            cnf_dnf::convert_cnf_to_dnf_minimal::<Enc16, {OptimizedFor::AutoDetect}>(
                 black_box(&cnf),
                 black_box(16),
-                black_box(OptimizedFor::Avx512_16bits),
                 black_box(false),
             )
         });
@@ -151,10 +163,9 @@ fn bench_minimal_with_pruning(c: &mut Criterion) {
     // With early pruning
     group.bench_function("with_pruning", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf_minimal(
+            cnf_dnf::convert_cnf_to_dnf_minimal::<Enc16, {OptimizedFor::AutoDetect}>(
                 black_box(&cnf),
                 black_box(16),
-                black_box(OptimizedFor::Avx512_16bits),
                 black_box(true),
             )
         });
@@ -163,26 +174,19 @@ fn bench_minimal_with_pruning(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark X64 vs AVX2 vs AVX512 for 64-bit problems
+/// Benchmark encoding comparison for 64-bit problems
 fn bench_64bit_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("64bit_comparison");
 
     let cnf = generate_random_cnf(64, 8, 6, 42);
     group.throughput(Throughput::Elements(cnf.len() as u64));
 
-    let opt_levels = vec![
-        ("X64_scalar", OptimizedFor::X64),
-        ("AVX2_64bits", OptimizedFor::Avx2_64bits),
-        ("AVX512_64bits", OptimizedFor::Avx512_64bits),
-    ];
-
-    for (name, opt_level) in opt_levels {
-        group.bench_with_input(BenchmarkId::from_parameter(name), &opt_level, |b, &opt| {
-            b.iter(|| {
-                convert_cnf_to_dnf(black_box(&cnf), black_box(64), black_box(opt))
-            });
+    // All encodings support 64 variables, compare them
+    group.bench_function("Encoding64", |b| {
+        b.iter(|| {
+            cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(black_box(&cnf), black_box(64))
         });
-    }
+    });
 
     group.finish();
 }
@@ -200,10 +204,9 @@ fn bench_conjunction_density(c: &mut Criterion) {
 
     group.bench_function("sparse_2lit", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf(
+            cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(
                 black_box(&cnf_sparse),
                 black_box(n_vars),
-                black_box(OptimizedFor::Avx512_16bits),
             )
         });
     });
@@ -213,10 +216,9 @@ fn bench_conjunction_density(c: &mut Criterion) {
 
     group.bench_function("medium_4lit", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf(
+            cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(
                 black_box(&cnf_medium),
                 black_box(n_vars),
-                black_box(OptimizedFor::Avx512_16bits),
             )
         });
     });
@@ -226,10 +228,9 @@ fn bench_conjunction_density(c: &mut Criterion) {
 
     group.bench_function("dense_8lit", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf(
+            cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(
                 black_box(&cnf_dense),
                 black_box(n_vars),
-                black_box(OptimizedFor::Avx512_16bits),
             )
         });
     });
@@ -239,9 +240,9 @@ fn bench_conjunction_density(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_optimization_levels,
+    bench_encoding_types,
     bench_problem_sizes,
-    bench_avx512_variants,
+    bench_encoding_variants,
     bench_minimal_with_pruning,
     bench_64bit_comparison,
     bench_conjunction_density,

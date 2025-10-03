@@ -10,6 +10,7 @@ pub mod simd;     // SIMD-optimized implementations (AVX2, AVX512)
 
 // Re-export main types and functions for convenience
 pub use convert::{
-    cnf_to_string, convert_cnf_to_dnf, convert_cnf_to_dnf_minimal, convert_cnf_to_dnf_with_names,
-    dnf_to_string, OptimizedFor,
+    cnf_to_string, convert_cnf_to_dnf_with_names, dnf_to_string, OptimizedFor,
+    // Encoding-aware APIs with const generic optimization selection
+    convert_cnf_to_dnf, convert_cnf_to_dnf_minimal,
 };

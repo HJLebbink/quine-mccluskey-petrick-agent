@@ -1,8 +1,10 @@
 // Random CNF generation test with minimal DNF: 10 conjunctions, 64 bits, 8 disjunctions per conjunction
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::Enc64;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::Instant;
+use qm_agent::Enc32;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
@@ -15,18 +17,23 @@ fn main() {
     for _ in 0..N_CONJUNCTIONS {
         let mut conjunction = 0u64;
         for _ in 0..N_DISJUNCTIONS {
-            let r = rng.gen_range(0..N_BITS);
+            let r = rng.random_range(0..N_BITS);
             conjunction |= 1u64 << r;
         }
         cnf.push(conjunction);
     }
 
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
-
-    let start = Instant::now();
-    let min_dnf = cnf_dnf::convert_cnf_to_dnf_minimal(&cnf, N_BITS, OptimizedFor::X64, EARLY_PRUNE);
-    let duration = start.elapsed();
-
-    println!("DNF_min = {}", cnf_dnf::dnf_to_string(&min_dnf));
-    println!("Runtime: {:?}", duration);
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::X64 }>(&cnf, N_BITS, EARLY_PRUNE);
+        println!("Runtime: Enc64,X64: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS, EARLY_PRUNE);
+        println!("Runtime: Enc64,Avx512_64bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
 }

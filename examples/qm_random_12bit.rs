@@ -5,8 +5,8 @@
 //
 // This example uses 550 random minterms (25 * 22) from 4096 possible inputs
 
-use qm_agent::QMSolver;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use qm_agent::qm::random::generate_random_minterms;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("12-bit Encoding Example with 12 variables");
@@ -17,28 +17,21 @@ fn main() {
     const SEED: u64 = 42;
     const NUM_MINTERMS: usize = 25 * 22; // 550 minterms
 
-    println!("Generating random Boolean function with seed {}", SEED);
-    println!("Variables: {}", VARIABLES);
-    println!("Random minterms: {}", NUM_MINTERMS);
+    println!("Generating random Boolean function with seed {SEED}");
+    println!("Variables: {VARIABLES}");
+    println!("Random minterms: {NUM_MINTERMS}");
     println!();
 
-    let mut rng = StdRng::seed_from_u64(SEED);
-    let mut minterms = Vec::new();
-
-    // Generate random minterms
-    for _ in 0..NUM_MINTERMS {
-        let input = rng.gen_range(0..(1 << VARIABLES));
-        if !minterms.contains(&input) {
-            minterms.push(input);
-        }
-    }
+    // Use the reusable random minterm generator
+    let minterms: Vec<u32> = generate_random_minterms(VARIABLES, NUM_MINTERMS, SEED);
 
     println!("Generated {} unique minterms from {} possible inputs",
              minterms.len(), 1 << VARIABLES);
     println!();
 
-    let mut solver = QMSolver::new(VARIABLES);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(VARIABLES);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     println!("Computing minimization...");
     let start = std::time::Instant::now();

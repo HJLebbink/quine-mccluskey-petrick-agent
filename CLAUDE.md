@@ -57,7 +57,7 @@ cargo run --example cnf_2_dnf_5
 cargo bench --bench cnf_to_dnf_bench
 
 # Run specific benchmark groups
-cargo bench --bench cnf_to_dnf_bench -- optimization_levels
+cargo bench --bench cnf_to_dnf_bench -- encoding_types
 cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
 
 # Save baseline for comparison
@@ -94,11 +94,15 @@ cargo run -- examples
 - Convenience functions for common operations (parsing, variable name generation)
 
 **QM Module** (`src/qm/`):
-- `algorithm.rs`: Core QM algorithm implementation with `DummyImplicant` and `BitState` types
-- `petricks.rs`: Implementation of Petrick's method for finding minimal covers
+- `implicant.rs`: `Implicant` structure and `BitState` enum (Zero, One, DontCare)
+- `quine_mccluskey.rs`: Core QM algorithm implementation
+- `petricks_method.rs`: Implementation of Petrick's method for finding minimal covers
+- `qm_solver.rs`: `QMSolver` orchestration and public API
+- `qm_result.rs`: `QMResult` output structure
+- `encoding.rs`: `MintermEncoding` trait and encoding types (Encoding16/32/64)
+- `minterm_set.rs`: `MintermSet` data structure
+- `random.rs`: Random minterm generation utilities (for testing and benchmarking)
 - `classic.rs`: C++ API-compatible port with preserved naming conventions
-- `utils.rs`: Utility functions for the QM algorithm
-- `solver.rs`: `QMSolver` orchestration and public API
 - `mod.rs`: Module interface with convenient re-exports
 
 **CLI Binary** (`src/main.rs`):
@@ -109,11 +113,15 @@ cargo run -- examples
 
 **CNF to DNF Module** (`src/cnf_dnf/`):
 - `convert.rs`: Main conversion logic and algorithms
-  - `convert_cnf_to_dnf()`: Convert Conjunctive Normal Form to Disjunctive Normal Form
-  - `convert_cnf_to_dnf_minimal()`: Find minimal DNF with early pruning optimization
-  - `OptimizedFor` enum: Select optimization level (X64, AVX2, AVX512 variants)
+  - `convert_cnf_to_dnf_encoding<E>()`: Convert CNF to DNF with encoding-aware optimization
+  - `convert_cnf_to_dnf_minimal_encoding<E>()`: Find minimal DNF with early pruning optimization
+  - `convert_cnf_to_dnf_with_names()`: String-based variable name support
+  - Encoding types automatically select optimal SIMD strategy:
+    - `Enc16` (≤16 vars) → AVX512_16bits
+    - `Enc32` (≤32 vars) → AVX512_32bits
+    - `Enc64` (≤64 vars) → AVX512_64bits
   - Subsumption checking to minimize resulting DNF
-  - String-based variable name support via `convert_cnf_to_dnf_translated()`
+  - Type-safe validation of variable counts
 - `simd.rs`: SIMD-optimized implementations (x86_64 only)
   - AVX512 implementations for 8-bit, 16-bit, 32-bit, and 64-bit elements
   - AVX2 implementation for 64-bit elements
@@ -152,12 +160,13 @@ The CLI provides multiple output formats:
 - **Unit tests**: Located in `src/lib.rs` and module files, test core library functionality (14 tests)
 - **Integration tests**: Located in `tests/integration_tests.rs`, test CLI behavior end-to-end (10 tests)
 - **Equality tests**: Located in `tests/equality_tests.rs`, randomized quality assurance tests
-  - `quick_equality_smoke_test`: 100 iterations (runs by default)
-  - `equality_test`: 100,000 iterations testing all optimization levels (run with `--ignored`)
+  - `quick_equality_smoke_test`: Tests that different encodings produce identical results
+  - `equality_test`: 100,000 iterations testing all encodings (run with `--ignored`)
   - `equality_test_minimal`: 100,000 iterations testing early pruning correctness (run with `--ignored`)
 - **Examples**: 15 total (7 CNF to DNF + 8 QM) with comprehensive README documentation
 - **Benchmarks**: Criterion-based benchmarks in `benches/cnf_to_dnf_bench.rs`
-  - 6 benchmark groups comparing X64, AVX2, and AVX512 performance
+  - 6 benchmark groups comparing Encoding16, Encoding32, and Encoding64 performance
+  - Tests different problem sizes and conjunction densities
   - Detailed results and analysis in `benches/RESULTS.md`
 - Integration tests use `assert_cmd` and `predicates` for CLI testing
 - Tests cover all input formats, output formats, error conditions, and edge cases
@@ -165,7 +174,7 @@ The CLI provides multiple output formats:
 ## Key Implementation Notes
 
 ### Quine-McCluskey Algorithm
-- Uses `DummyImplicant` structure with `BitState` enum (Zero, One, DontCare)
+- Uses `Implicant` structure with `BitState` enum (Zero, One, DontCare)
 - `BitState` is `Copy` for zero-cost operations
 - Prime implicants found through iterative combining until no more combinations possible
 - Essential prime implicants currently simplified (taking first half of prime implicants)
@@ -178,8 +187,13 @@ The CLI provides multiple output formats:
 - Subsumption checking: If `z | q == z`, then z is subsumed; if `z | q == q`, then q is subsumed
 - **Critical**: Uses O(n) filtering with HashSet for deletions (not O(n²) repeated Vec::remove)
 - Early pruning optimization discards non-minimal terms during computation
-- `OptimizedFor` enum controls which SIMD implementation to use
+- **Encoding-aware API**: Use generic parameter to specify encoding type
+  - `convert_cnf_to_dnf_encoding::<Encoding16>(&cnf, n_bits)` for ≤16 variables
+  - `convert_cnf_to_dnf_encoding::<Encoding32>(&cnf, n_bits)` for ≤32 variables
+  - `convert_cnf_to_dnf_encoding::<Encoding64>(&cnf, n_bits)` for ≤64 variables
+- Encoding type automatically selects optimal SIMD implementation
 - Maximum 64 variables for u64-based representation
+- Runtime validation ensures n_bits doesn't exceed encoding capacity
 
 ### SIMD Optimizations
 - Runtime CPU feature detection with `is_x86_feature_detected!()`

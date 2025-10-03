@@ -1,8 +1,10 @@
 // Random CNF generation test: 500 conjunctions, 16 bits, 8 disjunctions per conjunction
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::Enc16;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::Instant;
+use qm_agent::Enc32;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
@@ -14,23 +16,35 @@ fn main() {
     for _ in 0..N_CONJUNCTIONS {
         let mut conjunction = 0u64;
         for _ in 0..N_DISJUNCTIONS {
-            let r = rng.gen_range(0..N_BITS);
+            let r = rng.random_range(0..N_BITS);
             conjunction |= 1u64 << r;
         }
         cnf.push(conjunction);
     }
 
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
-
-    //let of = OptimizedFor::detect_best(N_BITS);
-    let of = OptimizedFor::Avx512_64bits;
-    println!("Optimized for = {}", of);
-
-    let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf(&cnf, N_BITS, of);
-    let duration = start.elapsed();
-
-    println!("DNF size = {}", dnf.len());
-    println!("Runtime: {:?}", duration);
-    // Note: Full DNF not printed due to size
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::X64 }>(&cnf, N_BITS);
+        println!("Runtime: Enc16,X64: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_16bits }>(&cnf, N_BITS);
+        println!("Runtime: Enc16,Avx512_16bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_32bits }>(&cnf, N_BITS);
+        println!("Runtime: Enc16,Avx512_32bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
+    {
+        let start = Instant::now();
+        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS);
+        println!("Runtime: Enc16,Avx512_64bits: {:?}", start.elapsed());
+        println!("DNF size = {}", dnf.len());
+    }
 }

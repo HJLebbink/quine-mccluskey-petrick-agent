@@ -132,7 +132,7 @@ impl Parser {
         if let Some(Token::Not) = self.current() {
             self.advance();
             let expr = self.parse_not()?;
-            Ok(BoolExpr::not(expr))
+            Ok(BoolExpr::negate(expr))
         } else {
             self.parse_primary()
         }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_parse_not() {
         let expr = parse_bool_expr("!a").unwrap();
-        assert_eq!(expr, BoolExpr::not(BoolExpr::var("a")));
+        assert_eq!(expr, BoolExpr::negate(BoolExpr::var("a")));
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod tests {
         let expr = parse_bool_expr("!!a").unwrap();
         assert_eq!(
             expr,
-            BoolExpr::not(BoolExpr::not(BoolExpr::var("a")))
+            BoolExpr::negate(BoolExpr::negate(BoolExpr::var("a")))
         );
     }
 }

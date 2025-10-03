@@ -1,19 +1,20 @@
-use super::algorithm::DummyImplicant;
+use super::encoding::MintermEncoding;
+use super::implicant::Implicant;
 
-pub struct PetricksMethod {
-    prime_implicants: Vec<DummyImplicant>,
-    minterms: Vec<u32>,
+pub struct PetricksMethod<E: MintermEncoding> {
+    prime_implicants: Vec<Implicant<E>>,
+    minterms: Vec<E::Value>,
 }
 
-impl PetricksMethod {
-    pub fn new(prime_implicants: &[DummyImplicant], minterms: &[u32]) -> Self {
+impl<E: MintermEncoding> PetricksMethod<E> {
+    pub fn new(prime_implicants: &[Implicant<E>], minterms: &[E::Value]) -> Self {
         Self {
             prime_implicants: prime_implicants.to_vec(),
             minterms: minterms.to_vec(),
         }
     }
 
-    pub fn find_minimal_cover(&self) -> Vec<DummyImplicant> {
+    pub fn find_minimal_cover(&self) -> Vec<Implicant<E>> {
         if self.prime_implicants.is_empty() {
             return Vec::new();
         }

@@ -18,7 +18,7 @@
 // Expected result: 0XX0 0X1X X10X 10XX
 // Which means: (A'D') + (A'C) + (BC') + (AB')
 
-use qm_agent::QMSolver;
+use qm_agent::{QMSolver, Enc32};
 
 fn main() {
     println!("=== Quine-McCluskey Example: Needs Petrick's Method ===\n");
@@ -30,8 +30,9 @@ fn main() {
     println!("Number of variables: {}", variables);
     println!();
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(&minterms);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    solver.set_minterms(&minterms_u64);
 
     let result = solver.solve();
 

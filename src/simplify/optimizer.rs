@@ -82,7 +82,7 @@ fn simplify_with_integer_vars(
         // Use tautology to represent else clause
         let else_condition = BoolExpr::or(
             BoolExpr::var(&variables[0]),
-            BoolExpr::not(BoolExpr::var(&variables[0])),
+            BoolExpr::negate(BoolExpr::var(&variables[0])),
         );
         simplified_conditions.push((else_condition, default.clone()));
     }
@@ -107,9 +107,15 @@ fn minimize_for_output(
     let var_count = table.variable_count();
 
     // Use QMSolver from existing module with our variable names
-    let mut solver = QMSolver::with_variable_names(var_count, table.variables.clone());
-    solver.set_minterms(minterms);
-    solver.set_dont_cares(dont_cares);
+    use crate::qm::Enc32;
+    let mut solver = QMSolver::<Enc32>::with_variable_names(var_count, table.variables.clone());
+
+    // Convert u32 to u64 for Enc32
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    let dont_cares_u64: Vec<u64> = dont_cares.iter().map(|&x| x as u64).collect();
+
+    solver.set_minterms(&minterms_u64);
+    solver.set_dont_cares(&dont_cares_u64);
 
     let result = solver.solve();
 
@@ -123,7 +129,7 @@ fn minimize_for_output(
         // Return first variable as placeholder (we'll handle this better later)
         return Ok(BoolExpr::or(
             BoolExpr::var(&table.variables[0]),
-            BoolExpr::not(BoolExpr::var(&table.variables[0])),
+            BoolExpr::negate(BoolExpr::var(&table.variables[0])),
         ));
     }
 
@@ -184,11 +190,10 @@ fn parse_and_term(term: &str, variables: &[String]) -> Result<BoolExpr, String> 
 
             // Find the longest matching variable name
             for var in variables {
-                if remaining.starts_with(var.as_str()) {
-                    if matched_var.is_none() || var.len() > matched_var.as_ref().unwrap().len() {
+                if remaining.starts_with(var.as_str())
+                    && (matched_var.is_none() || var.len() > matched_var.as_ref().unwrap().len()) {
                         matched_var = Some(var.clone());
                     }
-                }
             }
 
             let var_name = if let Some(var) = matched_var {
@@ -207,7 +212,7 @@ fn parse_and_term(term: &str, variables: &[String]) -> Result<BoolExpr, String> 
             };
 
             let var_expr = if negated {
-                BoolExpr::not(BoolExpr::var(&var_name))
+                BoolExpr::negate(BoolExpr::var(&var_name))
             } else {
                 BoolExpr::var(&var_name)
             };
@@ -286,7 +291,7 @@ mod tests {
             "1",
         );
         branch_set.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::not(BoolExpr::var("b"))),
+            BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",
         );
         branch_set.set_default("0");
@@ -324,7 +329,7 @@ mod tests {
         let expr2 = parse_and_term("a'b", &vars).unwrap();
         assert_eq!(
             expr2,
-            BoolExpr::and(BoolExpr::not(BoolExpr::var("a")), BoolExpr::var("b"))
+            BoolExpr::and(BoolExpr::negate(BoolExpr::var("a")), BoolExpr::var("b"))
         );
     }
 
@@ -346,7 +351,7 @@ mod tests {
         assert_eq!(
             expr3,
             BoolExpr::and(
-                BoolExpr::not(BoolExpr::var("count")),
+                BoolExpr::negate(BoolExpr::var("count")),
                 BoolExpr::var("enabled")
             )
         );
@@ -360,7 +365,7 @@ mod tests {
         let expr2 = BoolExpr::or(BoolExpr::var("a"), BoolExpr::var("b"));
         assert_eq!(format_bool_expr(&expr2), "a || b");
 
-        let expr3 = BoolExpr::not(BoolExpr::var("a"));
+        let expr3 = BoolExpr::negate(BoolExpr::var("a"));
         assert_eq!(format_bool_expr(&expr3), "!a");
     }
 }

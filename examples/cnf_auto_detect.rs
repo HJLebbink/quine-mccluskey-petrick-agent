@@ -1,9 +1,10 @@
-// Example demonstrating automatic hardware detection for CNF to DNF conversion
+// Example demonstrating encoding-aware API for CNF to DNF conversion
 //
-// This example shows how to use OptimizedFor::detect_best() to automatically
-// select the best SIMD instruction set available on the current hardware.
+// This example shows how to use the encoding-aware API which automatically
+// selects the optimal SIMD strategy based on the encoding type.
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
+use qm_agent::qm::{Enc16, Enc32, Enc64};
 
 fn main() {
     // Define a CNF formula: (A + B) ∧ (A + C) ∧ (B + C)
@@ -19,17 +20,25 @@ fn main() {
     println!("CNF formula: (A + B) ∧ (A + C) ∧ (B + C)");
     println!();
 
-    // Automatically detect the best optimization for this hardware
-    let optimization = OptimizedFor::detect_best(n_variables);
-    println!("Detected optimization: {}", optimization);
-    println!("Maximum bits supported: {}", optimization.max_bits());
+    println!("NEW ENCODING-AWARE API:");
+    println!("The encoding type automatically selects the optimal SIMD strategy!");
     println!();
 
-    // Convert CNF to DNF using the auto-detected optimization
-    let dnf = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, optimization);
+    // Convert using Encoding16 (for problems with ≤16 variables)
+    let dnf_16 = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    println!("Encoding16: {} terms (auto-selected Avx512_16bits)", dnf_16.len());
+
+    // Convert using Encoding32 (for problems with ≤32 variables)
+    let dnf_32 = cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    println!("Encoding32: {} terms (auto-selected Avx512_32bits)", dnf_32.len());
+
+    // Convert using Encoding64 (for problems with ≤64 variables)
+    let dnf_64 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    println!("Encoding64: {} terms (auto-selected Avx512_64bits)", dnf_64.len());
+    println!();
 
     println!("DNF result (minterms):");
-    for term in &dnf {
+    for term in &dnf_64 {
         print!("  ");
         for bit in 0..n_variables {
             if (term >> bit) & 1 == 1 {
@@ -40,25 +49,13 @@ fn main() {
     }
     println!();
 
-    // Compare with explicit optimizations
-    println!("Comparison with other optimization levels:");
-
-    let optimizations = vec![
-        OptimizedFor::X64,
-        OptimizedFor::Avx2_64bits,
-        OptimizedFor::Avx512_64bits,
-        OptimizedFor::Avx512_32bits,
-        OptimizedFor::Avx512_16bits,
-        OptimizedFor::Avx512_8bits,
-    ];
-
-    for opt in optimizations {
-        let dnf_test = cnf_dnf::convert_cnf_to_dnf(&cnf, n_variables, opt);
-        println!("  {}: {} terms (max {} bits)",
-                 opt, dnf_test.len(), opt.max_bits());
-    }
+    println!("Benefits of the encoding-aware API:");
+    println!("  ✓ No need to manually select optimization level");
+    println!("  ✓ Type-safe: encoding validates variable count");
+    println!("  ✓ Automatically uses best SIMD strategy for encoding");
+    println!("  ✓ Simpler API with fewer parameters");
     println!();
 
-    println!("Note: All optimizations should produce the same result.");
-    println!("The difference is in execution speed, not correctness.");
+    println!("Note: All encodings produce identical results for compatible variable counts.");
+    println!("The difference is in execution speed and maximum variable count supported.");
 }

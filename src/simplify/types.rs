@@ -24,7 +24,7 @@ impl BoolExpr {
         BoolExpr::Var(name.to_string())
     }
 
-    pub fn not(expr: BoolExpr) -> Self {
+    pub fn negate(expr: BoolExpr) -> Self {
         BoolExpr::Not(Box::new(expr))
     }
 
@@ -122,6 +122,12 @@ pub struct BranchSet {
     pub variable_types: HashMap<String, VariableType>,  // Variable domains
 }
 
+impl Default for BranchSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BranchSet {
     pub fn new() -> Self {
         Self {
@@ -208,6 +214,12 @@ pub struct SimplificationAnalysis {
     pub dead_branches: Vec<DeadBranch>,
     pub uncovered_minterms: Vec<u32>,
     pub total_coverage_percent: f64,
+}
+
+impl Default for SimplificationAnalysis {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SimplificationAnalysis {

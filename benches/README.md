@@ -1,6 +1,6 @@
 # CNF to DNF Benchmarks
 
-Comprehensive benchmarks comparing different SIMD optimization levels for CNF to DNF conversion.
+Comprehensive benchmarks comparing different encoding types for CNF to DNF conversion.
 
 ## Running Benchmarks
 
@@ -14,19 +14,19 @@ cargo bench --bench cnf_to_dnf_bench
 Run only specific benchmark groups:
 
 ```bash
-# Compare all optimization levels (X64, AVX2, AVX512 variants)
-cargo bench --bench cnf_to_dnf_bench -- optimization_levels
+# Compare all encoding types (Encoding16, Encoding32, Encoding64)
+cargo bench --bench cnf_to_dnf_bench -- encoding_types
 
 # Test different problem sizes
 cargo bench --bench cnf_to_dnf_bench -- problem_sizes
 
-# Compare AVX512 variants with matching bit widths
-cargo bench --bench cnf_to_dnf_bench -- avx512_variants
+# Compare encodings with matching problem sizes
+cargo bench --bench cnf_to_dnf_bench -- encoding_variants
 
 # Compare minimal DNF with/without early pruning
 cargo bench --bench cnf_to_dnf_bench -- minimal_dnf
 
-# Compare X64 vs AVX2 vs AVX512 for 64-bit problems
+# Test 64-bit problems with Encoding64
 cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
 
 # Test sparse vs dense conjunction patterns
@@ -44,35 +44,29 @@ cargo bench --bench cnf_to_dnf_bench -- --baseline main
 
 ## Benchmark Groups
 
-### 1. `optimization_levels`
-Compares all optimization levels on a small problem (8 variables, 5 conjunctions):
-- **X64**: Scalar baseline implementation
-- **AVX2_64bits**: AVX2 SIMD (4 elements per vector)
-- **AVX512_8bits**: AVX512 with 8-bit elements (64 elements per vector)
-- **AVX512_16bits**: AVX512 with 16-bit elements (32 elements per vector)
-- **AVX512_32bits**: AVX512 with 32-bit elements (16 elements per vector)
-- **AVX512_64bits**: AVX512 with 64-bit elements (8 elements per vector)
+### 1. `encoding_types`
+Compares all encoding types on a small problem (8 variables, 5 conjunctions):
+- **Encoding16**: Supports ≤16 variables, auto-selects AVX512_16bits
+- **Encoding32**: Supports ≤32 variables, auto-selects AVX512_32bits
+- **Encoding64**: Supports ≤64 variables, auto-selects AVX512_64bits
 
-**Purpose**: Understand relative performance of each optimization level.
+**Purpose**: Understand relative performance of each encoding type. Shows automatic SIMD optimization selection.
 
 ### 2. `problem_sizes`
 Tests scaling behavior with different problem sizes:
-- **8var_5conj**: 8 variables, 5 conjunctions (small)
-- **16var_8conj**: 16 variables, 8 conjunctions (medium)
-- **32var_10conj**: 32 variables, 10 conjunctions (large)
+- **8var_5conj**: 8 variables, 5 conjunctions (small) - tested with Encoding16, 32, 64
+- **16var_8conj**: 16 variables, 8 conjunctions (medium) - tested with Encoding16, 32, 64
+- **32var_10conj**: 32 variables, 10 conjunctions (large) - tested with Encoding32, 64
 
-Compares X64 baseline vs optimal AVX512 variant for each size.
+**Purpose**: Show how SIMD benefits scale with problem size and demonstrate type-safe encoding validation.
 
-**Purpose**: Show how SIMD benefits scale with problem size.
+### 3. `encoding_variants`
+Tests each encoding with problem sizes matching their capacity:
+- **Encoding16_16vars**: 16 variables (at capacity)
+- **Encoding32_32vars**: 32 variables (at capacity)
+- **Encoding64_64vars**: 64 variables (at capacity)
 
-### 3. `avx512_variants`
-Tests each AVX512 variant with problem sizes matching their bit width:
-- **8bit_8vars**: 8-bit SIMD with 8-variable problems
-- **16bit_16vars**: 16-bit SIMD with 16-variable problems
-- **32bit_32vars**: 32-bit SIMD with 32-variable problems
-- **64bit_64vars**: 64-bit SIMD with 64-variable problems
-
-**Purpose**: Show each variant performing optimally on appropriately-sized problems.
+**Purpose**: Show each encoding performing optimally with maximum variable counts.
 
 ### 4. `minimal_dnf`
 Compares minimal DNF conversion with and without early pruning optimization:
@@ -101,26 +95,32 @@ Tests performance with different literal densities:
 
 ### Expected Performance Characteristics
 
-1. **SIMD Speedup**:
+1. **Encoding Selection**:
+   - Each encoding automatically selects optimal SIMD implementation
+   - Encoding16 → AVX512_16bits (32 elements per vector)
+   - Encoding32 → AVX512_32bits (16 elements per vector)
+   - Encoding64 → AVX512_64bits (8 elements per vector)
+
+2. **SIMD Speedup**:
    - AVX512 should show 2-8x speedup over scalar for matching bit widths
-   - AVX2 should show 1.5-4x speedup over scalar
    - Speedup increases with problem size (more data to vectorize)
+   - Automatic fallback to scalar if SIMD unavailable
 
-2. **Bit Width Selection**:
-   - Smaller bit widths (8-bit, 16-bit) process more elements per vector
-   - Should be fastest when problem fits within bit width limit
-   - Using wider bits than needed reduces SIMD advantage
+3. **Type Safety**:
+   - Encoding validates variable count at runtime
+   - Using Encoding16 with 20 variables will fail validation
+   - Choose encoding based on your problem's variable count
 
-3. **Early Pruning**:
+4. **Early Pruning**:
    - Should show significant speedup when finding minimal DNF
    - More effective with larger problems and denser conjunctions
 
-4. **CPU Support**:
-   - If your CPU lacks AVX512, those benchmarks fall back to scalar
+5. **CPU Support**:
+   - If your CPU lacks AVX512, benchmarks fall back to scalar
    - Check CPU features to understand your results:
    ```bash
    # Windows
-   cargo run --example cnf_2_dnf_0  # Shows detected SIMD features
+   cargo run --example cnf_auto_detect  # Shows detected SIMD features
 
    # Linux
    cat /proc/cpuinfo | grep flags
@@ -135,7 +135,7 @@ Criterion provides detailed statistics for each benchmark:
 
 Example output:
 ```
-optimization_levels/small/AVX512_64bits
+encoding_types/Encoding64
                         time:   [45.123 µs 45.456 µs 45.789 µs]
                         thrpt:  [219.52 elem/s 221.14 elem/s 222.76 elem/s]
                         change: [-15.234% -14.567% -13.901%] (p = 0.00 < 0.05)
@@ -167,6 +167,9 @@ Default Criterion settings:
 To add your own benchmark:
 
 ```rust
+use qm_agent::cnf_dnf::convert_cnf_to_dnf_encoding;
+use qm_agent::qm::Encoding16;
+
 fn bench_my_test(c: &mut Criterion) {
     let mut group = c.benchmark_group("my_test");
 
@@ -174,10 +177,9 @@ fn bench_my_test(c: &mut Criterion) {
 
     group.bench_function("test_name", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf(
+            convert_cnf_to_dnf_encoding::<Encoding16>(
                 black_box(&cnf),
-                black_box(4),
-                black_box(OptimizedFor::Avx512_64bits)
+                black_box(4)
             )
         });
     });

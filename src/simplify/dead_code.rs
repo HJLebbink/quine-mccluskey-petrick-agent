@@ -102,11 +102,10 @@ pub fn analyze_branches(branch_set: &BranchSet) -> Result<SimplificationAnalysis
                 if covered_minterms.contains(&minterm_idx) {
                     // Find which branch(es) already covered this
                     for (prev_idx, prev_coverage) in branch_coverage.iter().enumerate() {
-                        if prev_coverage.minterms_covered.contains(&minterm_idx) {
-                            if !overlaps_with.contains(&prev_idx) {
+                        if prev_coverage.minterms_covered.contains(&minterm_idx)
+                            && !overlaps_with.contains(&prev_idx) {
                                 overlaps_with.push(prev_idx);
                             }
-                        }
                     }
                 }
             }

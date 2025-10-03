@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Write};
@@ -114,11 +113,10 @@ fn handle_minimize(
 
 fn parse_input(input: &str) -> Result<QMRequest> {
     // Try parsing as file path first
-    if let Ok(file_content) = fs::read_to_string(input) {
-        if let Ok(request) = serde_json::from_str::<QMRequest>(&file_content) {
+    if let Ok(file_content) = fs::read_to_string(input)
+        && let Ok(request) = serde_json::from_str::<QMRequest>(&file_content) {
             return Ok(request);
         }
-    }
 
     // Try parsing as inline JSON
     if let Ok(request) = serde_json::from_str::<QMRequest>(input) {
@@ -247,11 +245,16 @@ fn integrate_your_qm_solver(
     _variable_names: &[String],
     show_steps: bool
 ) -> (String, Vec<String>, Vec<String>, Option<Vec<String>>) {
-    use qm_agent::QMSolver;
+    use qm_agent::{QMSolver, Enc32};
 
-    let mut solver = QMSolver::new(variables);
-    solver.set_minterms(minterms);
-    solver.set_dont_cares(dont_cares);
+    let mut solver = QMSolver::<Enc32>::new(variables);
+
+    // Convert u32 to u64 for Enc32
+    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
+    let dont_cares_u64: Vec<u64> = dont_cares.iter().map(|&x| x as u64).collect();
+
+    solver.set_minterms(&minterms_u64);
+    solver.set_dont_cares(&dont_cares_u64);
 
     let result = solver.solve();
 
