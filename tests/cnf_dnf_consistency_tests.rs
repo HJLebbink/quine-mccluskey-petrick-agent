@@ -1,6 +1,10 @@
-// Equality tests for CNF to DNF conversion
-// These are long-running randomized tests for quality assurance
-// Run with: cargo test --test equality_tests -- --ignored --nocapture
+// CNF to DNF Consistency Tests
+//
+// Long-running randomized tests that verify consistency across:
+// - Different encoding implementations (Enc16, Enc32, Enc64)
+// - Different optimization modes (with/without early pruning)
+//
+// Run with: cargo test --test cnf_dnf_consistency_tests -- --ignored --nocapture
 
 use qm_agent::cnf_dnf::{self, OptimizedFor};
 use qm_agent::qm::{Enc16, Enc32, Enc64};
@@ -48,19 +52,12 @@ fn equality_test() {
         }
 
         // Reference implementation: Encoding64 (supports all variable counts up to 64)
-        let dnf_64_a = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::X64}>(&cnf_64, n_variables);
+        let dnf_64_a = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf_64, n_variables, OptimizedFor::X64).unwrap();
 
-        
-        
-        
-        
-        
+
         // Test that different encodings produce identical results when compatible
         if n_variables <= 32 {
-            let dnf_32 = cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(
-                &cnf_64,
-                n_variables,
-            );
+            let dnf_32 = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf_64, n_variables, OptimizedFor::AutoDetect).unwrap();
             if !dnf_equal(&dnf_64_a, &dnf_32) {
                 println!(" Experiment {experiment}: Enc64/X64 != Enc32/AutoDetect with {n_variables} variables");
                 panic!("DNF mismatch: Enc64/X64 vs Enc32/AutoDetect with {n_variables} variables");
@@ -68,10 +65,7 @@ fn equality_test() {
         }
 
         if n_variables <= 16 {
-            let dnf_16 = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(
-                &cnf_64,
-                n_variables,
-            );
+            let dnf_16 = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf_64, n_variables, OptimizedFor::AutoDetect).unwrap();
             if !dnf_equal(&dnf_64_a, &dnf_16) {
                 println!(" Experiment {experiment}: Enc64/X64 != Enc16/AutoDetect with {n_variables} variables");
                 panic!("DNF mismatch: Enc64/X64 vs Enc16/AutoDetect with {n_variables} variables");
@@ -116,57 +110,45 @@ fn equality_test_minimal() {
             cnf.push(conjunction);
         }
 
-        // Test that EARLY_PRUNE=true and EARLY_PRUNE=false produce the same minimal result
+        // Test that multiple runs produce consistent results
         // Use appropriate encoding based on n_variables
         let (dnf_a, dnf_b, encoding_name) = if n_variables <= 16 {
             (
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc16, {OptimizedFor::AutoDetect}>(
+                cnf_dnf::cnf_to_dnf_minimal::<Enc16>(
                     &cnf,
-                    n_variables,
-                    true, // EARLY_PRUNE
-                ),
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc16, {OptimizedFor::AutoDetect}>(
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
+                cnf_dnf::cnf_to_dnf_minimal_reference::<Enc16>(
                     &cnf,
-                    n_variables,
-                    false, // no EARLY_PRUNE
-                ),
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
                 "Enc16"
             )
         } else if n_variables <= 32 {
             (
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc32, {OptimizedFor::AutoDetect}>(
+                cnf_dnf::cnf_to_dnf_minimal::<Enc32>(
                     &cnf,
-                    n_variables,
-                    true,
-                ),
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc32, {OptimizedFor::AutoDetect}>(
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
+                cnf_dnf::cnf_to_dnf_minimal_reference::<Enc32>(
                     &cnf,
-                    n_variables,
-                    false,
-                ),
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
                 "Enc32"
             )
         } else {
             (
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, {OptimizedFor::AutoDetect}>(
+                cnf_dnf::cnf_to_dnf_minimal::<Enc64>(
                     &cnf,
-                    n_variables,
-                    true,
-                ),
-                cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, {OptimizedFor::AutoDetect}>(
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
+                cnf_dnf::cnf_to_dnf_minimal_reference::<Enc64>(
                     &cnf,
-                    n_variables,
-                    false,
-                ),
+                    n_variables, OptimizedFor::AutoDetect).unwrap(),
                 "Enc64"
             )
         };
 
         if !dnf_equal(&dnf_a, &dnf_b) {
             println!(" Experiment {experiment}: Minimal DNF mismatch with {encoding_name} and {n_variables} variables");
-            println!("DNF_A (early prune=true):  {dnf_a:?}");
-            println!("DNF_B (early prune=false): {dnf_b:?}");
-            panic!("Minimal DNF mismatch: {encoding_name}/AutoDetect early_prune=true vs early_prune=false with {n_variables} variables");
+            println!("DNF_A (run 1): {dnf_a:?}");
+            println!("DNF_B (run 2): {dnf_b:?}");
+            panic!("Minimal DNF mismatch: {encoding_name}/AutoDetect produced inconsistent results with {n_variables} variables");
         }
 
         let elapsed = time_begin.elapsed();
@@ -205,10 +187,10 @@ fn quick_equality_smoke_test_cnf_dnf() {
             }
 
             // Reference: Encoding64 (supports all variable counts)
-            let dnf_64 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::X64}>(&cnf, n_variables);
+            let dnf_64 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, n_variables, OptimizedFor::X64).unwrap();
 
             if OptimizedFor::Avx512_64bits.is_supported() {
-                let dnf_64_a = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::Avx512_64bits}>(&cnf, n_variables);
+                let dnf_64_a = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, n_variables, OptimizedFor::Avx512_64bits).unwrap();
                 assert!(
                     dnf_equal(&dnf_64, &dnf_64_a),
                     "DNF mismatch: Enc64/X64 vs Enc64/Avx512_64bits with {} variables",
@@ -219,7 +201,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
             // Test that different encodings produce identical results when compatible
             if n_variables <= 32 {
                 if OptimizedFor::Avx512_64bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_64bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, n_variables, OptimizedFor::Avx512_64bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc32/Avx512_64bits with {} variables",
@@ -227,7 +209,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
                     );
                 }
                 if OptimizedFor::Avx512_32bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_32bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, n_variables, OptimizedFor::Avx512_32bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc32/Avx512_32bits with {} variables",
@@ -238,7 +220,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
 
             if n_variables <= 16 {
                 if OptimizedFor::Avx512_64bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_64bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, n_variables, OptimizedFor::Avx512_64bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc16/Avx512_64bits with {} variables",
@@ -246,7 +228,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
                     );
                 }
                 if OptimizedFor::Avx512_32bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_32bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, n_variables, OptimizedFor::Avx512_32bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc16/Avx512_32bits with {} variables",
@@ -254,7 +236,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
                     );
                 }
                 if OptimizedFor::Avx512_16bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_16bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, n_variables, OptimizedFor::Avx512_16bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc16/Avx512_16bits with {} variables",
@@ -265,7 +247,7 @@ fn quick_equality_smoke_test_cnf_dnf() {
 
             if n_variables <= 8 {
                 if OptimizedFor::Avx512_8bits.is_supported() {
-                    let dnf_x = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_8bits }>(&cnf, n_variables);
+                    let dnf_x = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, n_variables, OptimizedFor::Avx512_8bits ).unwrap();
                     assert!(
                         dnf_equal(&dnf_64, &dnf_x),
                         "DNF mismatch: Enc64/X64 vs Enc16/Avx512_8bits with {} variables",

@@ -1,0 +1,26 @@
+{
+  "variables": {
+    "a": "boolean",
+    "b": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "a && b",
+      "output": "return 1",
+      "metadata": {
+        "line": 10
+      }
+    },
+    {
+      "condition": "a && !b",
+      "output": "return 1",
+      "metadata": {
+        "line": 12
+      }
+    }
+  ],
+  "default": "return 0",
+  "context": {
+    "language": "go"
+  }
+}

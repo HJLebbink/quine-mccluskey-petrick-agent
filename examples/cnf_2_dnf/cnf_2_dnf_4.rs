@@ -23,19 +23,19 @@ fn main() {
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::X64 }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, N_BITS, OptimizedFor::X64 ).unwrap();
         println!("Runtime: Enc32,X64: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_32bits }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, N_BITS, OptimizedFor::Avx512_32bits ).unwrap();
         println!("Runtime: Enc32,Avx512_32bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc32, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, N_BITS, OptimizedFor::Avx512_64bits ).unwrap();
         println!("Runtime: Enc32,Avx512_64bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }

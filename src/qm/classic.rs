@@ -104,8 +104,7 @@ pub fn is_gray_code<E: MintermEncoding>(a: E::Value, b: E::Value) -> bool {
 ///   both the value type (u32 or u64) and the don't-care offset
 #[inline]
 pub fn replace_complements<E: MintermEncoding>(a: E::Value, b: E::Value) -> E::Value {
-    let neq = a ^ b;
-    a | neq | (neq << E::DK_OFFSET)
+    a | b | ((a ^ b) << E::DK_OFFSET)
 }
 
 /// Reduce minterms using classic O(n²) algorithm
@@ -184,8 +183,7 @@ pub fn reduce_minterms<E: MintermEncoding>(minterms: &[E::Value], show_info: boo
         total_comparisons += (max_i * max_j) as u64;
 
         if show_info {
-            println!("INFO: 413d6ad8: max_i = {}; max_j = {}; total_comparisons = {}",
-                     max_i, max_j, total_comparisons);
+            println!("INFO: 413d6ad8: max_i = {max_i}; max_j = {max_j}; total_comparisons = {total_comparisons}");
         }
 
         for i in 0..max_i {
@@ -626,12 +624,12 @@ pub mod petrick {
         // Convert CNF to DNF using encoding-aware API
         // Note: CNF is always u64-based, so we use Encoding64 for up to 64 variables
         let smallest_conjunctions = if n_variables <= 16 {
-            cnf_dnf::convert_cnf_to_dnf_minimal::<crate::qm::Enc16, {OptimizedFor::AutoDetect}>(&cnf, n_variables, false)
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc16>(&cnf, n_variables, OptimizedFor::AutoDetect)
         } else if n_variables <= 32 {
-            cnf_dnf::convert_cnf_to_dnf_minimal::<crate::qm::Enc32, {OptimizedFor::AutoDetect}>(&cnf, n_variables, false)
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc32>(&cnf, n_variables, OptimizedFor::AutoDetect)
         } else {
-            cnf_dnf::convert_cnf_to_dnf_minimal::<crate::qm::Enc64, {OptimizedFor::AutoDetect}>(&cnf, n_variables, false)
-        };
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc64>(&cnf, n_variables, OptimizedFor::AutoDetect)
+        }.expect("CNF to DNF conversion failed");
 
         if show_info {
             println!("DNF = {}", cnf_dnf::dnf_to_string(&smallest_conjunctions));

@@ -4,7 +4,6 @@ use qm_agent::cnf_dnf::{self, OptimizedFor};
 use qm_agent::qm::Enc16;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::Instant;
-use qm_agent::Enc32;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
@@ -25,25 +24,25 @@ fn main() {
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::X64 }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, N_BITS, OptimizedFor::X64 ).unwrap();
         println!("Runtime: Enc16,X64: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_16bits }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, N_BITS, OptimizedFor::Avx512_16bits ).unwrap();
         println!("Runtime: Enc16,Avx512_16bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_32bits }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, N_BITS, OptimizedFor::Avx512_32bits ).unwrap();
         println!("Runtime: Enc16,Avx512_32bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS);
+        let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, N_BITS, OptimizedFor::Avx512_64bits ).unwrap();
         println!("Runtime: Enc16,Avx512_64bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }

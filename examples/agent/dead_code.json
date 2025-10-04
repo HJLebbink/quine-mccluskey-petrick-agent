@@ -1,0 +1,27 @@
+{
+  "variables": {
+    "flag1": "boolean",
+    "flag2": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "flag1 || flag2",
+      "output": "action_a()",
+      "metadata": {
+        "line": 42
+      }
+    },
+    {
+      "condition": "flag1 && flag2",
+      "output": "action_b()",
+      "metadata": {
+        "line": 45,
+        "has_side_effects": false
+      }
+    }
+  ],
+  "default": "action_c()",
+  "context": {
+    "language": "cpp"
+  }
+}

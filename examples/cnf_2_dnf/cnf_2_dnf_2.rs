@@ -17,7 +17,7 @@ fn main() {
     println!("CNF = {:?}", cnf);
 
     let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf_with_names(&cnf);
+    let dnf = cnf_dnf::cnf_to_dnf_with_names(&cnf).unwrap();
     let duration = start.elapsed();
 
     println!("DNF = {:?}", dnf);

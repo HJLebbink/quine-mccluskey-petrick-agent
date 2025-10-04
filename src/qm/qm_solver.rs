@@ -16,39 +16,35 @@ pub struct QMSolver<E: MintermEncoding> {
 
 impl<E: MintermEncoding> QMSolver<E> {
     pub fn new(variables: usize) -> Self {
+        //TODO if variables > 26, should we generate names like AA, BB, ...?
         let variable_names = (0..variables)
             .map(|i| ((b'A' + i as u8) as char).to_string())
             .collect();
 
-        Self {
-            variables,
-            minterms: Vec::new(),
-            dont_cares: Vec::new(),
-            variable_names,
-        }
+        Self::with_variable_names(variables, variable_names)
     }
 
     pub fn with_variable_names(variables: usize, names: Vec<String>) -> Self {
         Self {
             variables,
-            minterms: Vec::new(),
-            dont_cares: Vec::new(),
+            minterms:  Vec::with_capacity(0),
+            dont_cares:  Vec::with_capacity(0),
             variable_names: names,
         }
     }
 
-    pub fn set_minterms(&mut self, minterms: &[E::Value]) {
-        self.minterms = minterms.to_vec();
+    pub fn set_minterms(&mut self, minterms: Vec<E::Value>) {
+        self.minterms = minterms;
     }
 
-    pub fn set_dont_cares(&mut self, dont_cares: &[E::Value]) {
-        self.dont_cares = dont_cares.to_vec();
+    pub fn set_dont_cares(&mut self, dont_cares: Vec<E::Value>) {
+        self.dont_cares = dont_cares;
     }
 
     pub fn solve(&self) -> QMResult {
         let mut qm = QuineMcCluskey::<E>::new(self.variables);
-        qm.set_minterms(&self.minterms);
-        qm.set_dont_cares(&self.dont_cares);
+        qm.set_minterms(self.minterms.clone());
+        qm.set_dont_cares(self.dont_cares.clone());
 
         let prime_implicants = qm.find_prime_implicants();
         let essential_pis = qm.find_essential_prime_implicants();
@@ -57,13 +53,12 @@ impl<E: MintermEncoding> QMSolver<E> {
         let minimal_cover = petricks.find_minimal_cover();
 
         let minimized_expression = self.format_expression(&minimal_cover);
-        let steps = qm.get_solution_steps();
 
         QMResult {
             minimized_expression,
             prime_implicants: self.format_implicants(&prime_implicants),
             essential_prime_implicants: self.format_implicants(&essential_pis),
-            solution_steps: steps,
+            solution_steps: qm.get_solution_steps().to_vec(),
             cost_original: self.calculate_original_cost(),
             cost_minimized: minimal_cover.len() * 2,
         }

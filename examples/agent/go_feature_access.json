@@ -1,0 +1,46 @@
+{
+  "variables": {
+    "isPremium": "boolean",
+    "isBeta": "boolean",
+    "isAdmin": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "isPremium && isBeta",
+      "output": "return true",
+      "metadata": {
+        "line": 10,
+        "source": "if isPremium && isBeta { return true }"
+      }
+    },
+    {
+      "condition": "isPremium && isAdmin",
+      "output": "return true",
+      "metadata": {
+        "line": 13,
+        "source": "if isPremium && isAdmin { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && isBeta",
+      "output": "return true",
+      "metadata": {
+        "line": 16,
+        "source": "if isAdmin && isBeta { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin",
+      "output": "return true",
+      "metadata": {
+        "line": 19,
+        "source": "if isAdmin { return true }"
+      }
+    }
+  ],
+  "default": "return false",
+  "context": {
+    "language": "go",
+    "original_code": "func canAccessFeature(isPremium, isBeta, isAdmin bool) bool {\n\tif isPremium && isBeta {\n\t\treturn true\n\t}\n\tif isPremium && isAdmin {\n\t\treturn true\n\t}\n\tif isAdmin && isBeta {\n\t\treturn true\n\t}\n\tif isAdmin {\n\t\treturn true\n\t}\n\treturn false\n}"
+  }
+}

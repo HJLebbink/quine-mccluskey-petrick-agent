@@ -4,14 +4,12 @@ use qm_agent::cnf_dnf::{self, OptimizedFor};
 use qm_agent::qm::Enc64;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::Instant;
-use qm_agent::Enc32;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);
     const N_BITS: usize = 64;
     const N_CONJUNCTIONS: usize = 10;
     const N_DISJUNCTIONS: usize = 8;
-    const EARLY_PRUNE: bool = true;
 
     let mut cnf: Vec<u64> = Vec::new();
     for _ in 0..N_CONJUNCTIONS {
@@ -26,13 +24,13 @@ fn main() {
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::X64 }>(&cnf, N_BITS, EARLY_PRUNE);
+        let dnf = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(&cnf, N_BITS, OptimizedFor::X64 ).unwrap();
         println!("Runtime: Enc64,X64: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }
     {
         let start = Instant::now();
-        let dnf = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, { OptimizedFor::Avx512_64bits }>(&cnf, N_BITS, EARLY_PRUNE);
+        let dnf = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(&cnf, N_BITS, OptimizedFor::Avx512_64bits ).unwrap();
         println!("Runtime: Enc64,Avx512_64bits: {:?}", start.elapsed());
         println!("DNF size = {}", dnf.len());
     }

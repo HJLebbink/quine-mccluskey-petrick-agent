@@ -165,8 +165,8 @@ impl BranchSet {
 #[derive(Debug)]
 pub struct TruthTable {
     pub variables: Vec<String>,
-    pub output_groups: HashMap<String, Vec<u32>>,  // output -> list of minterms
-    pub dont_cares: Vec<u32>,
+    pub output_groups: HashMap<String, Vec<u64>>,  // output -> list of minterms
+    pub dont_cares: Vec<u64>,
 }
 
 impl TruthTable {

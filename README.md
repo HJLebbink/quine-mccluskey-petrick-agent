@@ -30,6 +30,13 @@ This tool implements the Quine-McCluskey algorithm to minimize Boolean functions
   - Truth table generation
   - Interactive mode
 
+- **Performance Optimizations (NEW!)**:
+  - AVX512 SIMD vectorization for Quine-McCluskey hot loop
+  - 4-16x speedup on compatible CPUs for large problems
+  - Runtime CPU feature detection with automatic scalar fallback
+  - Handles up to 16 variables efficiently (~10s vs ~120s previously)
+  - All correctness guarantees preserved
+
 - **CNF to DNF Conversion**:
   - Conjunctive Normal Form to Disjunctive Normal Form conversion
   - Minimal DNF computation with early pruning optimization
@@ -37,6 +44,15 @@ This tool implements the Quine-McCluskey algorithm to minimize Boolean functions
   - Multiple bit-width variants (8, 16, 32, 64-bit)
   - Runtime CPU feature detection with automatic fallback
   - Up to 4x speedup on large problems with AVX512
+
+- **Claude Integration (NEW!)**:
+  - JSON API for simplifying if-then-else conditions
+  - Works with any programming language (Go, Rust, C++, Python, etc.)
+  - Claude handles language parsing, agent handles boolean algebra
+  - Dead code detection across branches
+  - Coverage analysis for untested conditions
+  - Multi-language code generation
+  - Perfect for refactoring complex conditional logic
 
 ## Installation
 
@@ -163,6 +179,157 @@ truth table: 00110110
    • BC
 
 💰 Cost Reduction: 45.2%
+```
+
+## Claude Integration - Simplify If-Then-Else Logic
+
+The agent provides a JSON API for simplifying conditional logic in any programming language. Claude handles language understanding, and the agent provides boolean algebra optimization.
+
+### How It Works
+
+```
+┌─────────────────┐
+│  Your Code      │  Go, Rust, C++, Python, etc.
+│  (any language) │
+└────────┬────────┘
+         │
+         v
+┌─────────────────┐
+│  Claude         │  • Parses code
+│                 │  • Extracts conditions
+│                 │  • Detects side effects
+└────────┬────────┘
+         │ JSON
+         v
+┌─────────────────┐
+│  QM Agent       │  • Boolean optimization
+│  (this tool)    │  • Dead code detection
+│                 │  • Coverage analysis
+└────────┬────────┘
+         │ JSON
+         v
+┌─────────────────┐
+│  Claude         │  • Generates suggestions
+│                 │  • Produces idiomatic code
+└─────────────────┘
+```
+
+### Quick Example
+
+**Input code (Go):**
+```go
+func check(a, b bool) int {
+    if a && b {
+        return 1
+    }
+    if a && !b {
+        return 1
+    }
+    return 0
+}
+```
+
+**Agent JSON request:**
+```json
+{
+  "variables": {
+    "a": "boolean",
+    "b": "boolean"
+  },
+  "branches": [
+    {"condition": "a && b", "output": "return 1"},
+    {"condition": "a && !b", "output": "return 1"}
+  ],
+  "default": "return 0",
+  "context": {"language": "go"}
+}
+```
+
+**Run simplification:**
+```bash
+qm-agent simplify -i input.json
+# or
+cat input.json | qm-agent simplify
+```
+
+**Agent response shows:**
+- Condition simplifies to just `a`
+- 50% complexity reduction
+- Generated Go code suggestion
+
+**Suggested code:**
+```go
+func check(a, b bool) int {
+    if a {
+        return 1
+    }
+    return 0
+}
+```
+
+### JSON API Reference
+
+See `examples/agent/README.md` for complete API documentation and more examples.
+
+**Quick links:**
+- [Simple boolean example](examples/agent/simple.json)
+- [Go access control](examples/agent/go_example.json)
+- [Dead code detection](examples/agent/dead_code.json)
+- [Integer comparisons](examples/agent/integer_comparison.json)
+
+### Supported Features
+
+✅ Boolean variables
+✅ Integer variables (bounded domains)
+✅ Comparison operators (==, !=, <, >, <=, >=)
+✅ Boolean operators (&&, ||, !)
+✅ Dead code detection
+✅ Coverage analysis
+✅ Multi-language code generation (Go, Rust, C++, Python)
+✅ Complexity metrics
+
+### Use Cases
+
+1. **Refactoring complex conditions**
+   ```
+   if (a && b) || (a && !b)  →  if a
+   ```
+
+2. **Finding unreachable code**
+   ```
+   if a || b { ... }
+   elif a && b { ... }  // Dead code! Already covered above
+   ```
+
+3. **Detecting coverage gaps**
+   ```
+   if a && b { ... }
+   // Missing: !a && !b, !a && b, a && !b
+   ```
+
+4. **Optimizing access control**
+   ```
+   3 overlapping permission checks → 2 simplified checks
+   ```
+
+### Integration with Claude
+
+When Claude encounters complex conditional logic, it can:
+
+1. **Extract** conditions and outcomes
+2. **Call** `qm-agent simplify` with JSON
+3. **Receive** optimization suggestions
+4. **Generate** refactored code in original language style
+
+Example Claude workflow:
+```
+User: "Can you simplify this if-else mess?"
+Claude: [analyzes code]
+Claude: [calls agent with conditions]
+Claude: "I found 2 issues:
+         1. Branch 3 is unreachable (covered by branch 1)
+         2. The logic simplifies to just checking flag1
+         Here's the optimized version..."
 ```
 
 ## Architecture

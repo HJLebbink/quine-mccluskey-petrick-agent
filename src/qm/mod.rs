@@ -29,6 +29,7 @@
 pub mod implicant;
 pub mod quine_mccluskey;
 pub mod petricks_method;
+pub mod simd_gray_code;
 
 // High-level interface
 pub mod qm_solver;

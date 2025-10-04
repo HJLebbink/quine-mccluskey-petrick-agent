@@ -1,0 +1,49 @@
+{
+  "variables": {
+    "status": {
+      "type": "integer",
+      "min": 0,
+      "max": 7
+    }
+  },
+  "branches": [
+    {
+      "condition": "status == 0",
+      "output": "return \"pending\"",
+      "metadata": {
+        "line": 25
+      }
+    },
+    {
+      "condition": "status == 1",
+      "output": "return \"pending\"",
+      "metadata": {
+        "line": 27
+      }
+    },
+    {
+      "condition": "status == 2",
+      "output": "return \"active\"",
+      "metadata": {
+        "line": 29
+      }
+    },
+    {
+      "condition": "status == 3",
+      "output": "return \"active\"",
+      "metadata": {
+        "line": 31
+      }
+    },
+    {
+      "condition": "status >= 4",
+      "output": "return \"completed\"",
+      "metadata": {
+        "line": 33
+      }
+    }
+  ],
+  "context": {
+    "language": "rust"
+  }
+}

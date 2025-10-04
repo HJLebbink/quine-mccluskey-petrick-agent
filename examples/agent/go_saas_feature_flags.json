@@ -1,0 +1,147 @@
+{
+  "variables": {
+    "isPremium": "boolean",
+    "isEnterprise": "boolean",
+    "isTrial": "boolean",
+    "hasPaymentMethod": "boolean",
+    "isPaymentVerified": "boolean",
+    "isEmailVerified": "boolean",
+    "isPhoneVerified": "boolean",
+    "isAdmin": "boolean",
+    "isOwner": "boolean",
+    "isModerator": "boolean",
+    "hasAPIAccess": "boolean",
+    "hasBulkExport": "boolean",
+    "canInviteUsers": "boolean",
+    "canCreateTeams": "boolean",
+    "isRegionEU": "boolean",
+    "isRegionUS": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "isTrial && isAdmin",
+      "output": "return false",
+      "metadata": {
+        "line": 24,
+        "source": "if isTrial && isAdmin { return false }"
+      }
+    },
+    {
+      "condition": "isEnterprise",
+      "output": "return true",
+      "metadata": {
+        "line": 29,
+        "source": "if isEnterprise { return true }"
+      }
+    },
+    {
+      "condition": "isEnterprise && isEmailVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 32,
+        "source": "if isEnterprise && isEmailVerified { return true }"
+      }
+    },
+    {
+      "condition": "isEnterprise && isPaymentVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 35,
+        "source": "if isEnterprise && isPaymentVerified { return true }"
+      }
+    },
+    {
+      "condition": "isEnterprise && hasPaymentMethod",
+      "output": "return true",
+      "metadata": {
+        "line": 38,
+        "source": "if isEnterprise && hasPaymentMethod { return true }"
+      }
+    },
+    {
+      "condition": "isOwner && isPremium",
+      "output": "return true",
+      "metadata": {
+        "line": 41,
+        "source": "if isOwner && isPremium { return true }"
+      }
+    },
+    {
+      "condition": "isOwner && isEnterprise",
+      "output": "return true",
+      "metadata": {
+        "line": 44,
+        "source": "if isOwner && isEnterprise { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && isEnterprise",
+      "output": "return true",
+      "metadata": {
+        "line": 47,
+        "source": "if isAdmin && isEnterprise { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && isPremium && isEmailVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 50,
+        "source": "if isAdmin && isPremium && isEmailVerified { return true }"
+      }
+    },
+    {
+      "condition": "isPremium && isEmailVerified && isPaymentVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 53,
+        "source": "if isPremium && isEmailVerified && isPaymentVerified { return true }"
+      }
+    },
+    {
+      "condition": "isPremium && hasPaymentMethod && isEmailVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 56,
+        "source": "if isPremium && hasPaymentMethod && isEmailVerified { return true }"
+      }
+    },
+    {
+      "condition": "isOwner && isEmailVerified && hasPaymentMethod",
+      "output": "return true",
+      "metadata": {
+        "line": 59,
+        "source": "if isOwner && isEmailVerified && hasPaymentMethod { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && hasBulkExport && isEnterprise",
+      "output": "return true",
+      "metadata": {
+        "line": 62,
+        "source": "if isAdmin && hasBulkExport && isEnterprise { return true }"
+      }
+    },
+    {
+      "condition": "isPremium && canCreateTeams && isEmailVerified",
+      "output": "return true",
+      "metadata": {
+        "line": 65,
+        "source": "if isPremium && canCreateTeams && isEmailVerified { return true }"
+      }
+    },
+    {
+      "condition": "isTrial && isEmailVerified && isPhoneVerified && isRegionUS",
+      "output": "return true",
+      "metadata": {
+        "line": 69,
+        "source": "if isTrial && isEmailVerified && isPhoneVerified && isRegionUS { return true }"
+      }
+    }
+  ],
+  "default": "return false",
+  "context": {
+    "language": "go",
+    "original_code": "func canAccessAdvancedAnalytics(\n\tisPremium, isEnterprise, isTrial bool,\n\thasPaymentMethod, isPaymentVerified bool,\n\tisEmailVerified, isPhoneVerified bool,\n\tisAdmin, isOwner, isModerator bool,\n\thasAPIAccess, hasBulkExport bool,\n\tcanInviteUsers, canCreateTeams bool,\n\tisRegionEU, isRegionUS bool,\n) bool {\n\tif isEnterprise && isEmailVerified { return true }\n\tif isEnterprise && isPaymentVerified { return true }\n\tif isEnterprise && hasPaymentMethod { return true }\n\tif isOwner && isPremium { return true }\n\tif isOwner && isEnterprise { return true }\n\tif isAdmin && isEnterprise { return true }\n\tif isAdmin && isPremium && isEmailVerified { return true }\n\tif isPremium && isEmailVerified && isPaymentVerified { return true }\n\tif isPremium && hasPaymentMethod && isEmailVerified { return true }\n\tif isOwner && isEmailVerified && hasPaymentMethod { return true }\n\tif isAdmin && hasBulkExport && isEnterprise { return true }\n\tif isPremium && canCreateTeams && isEmailVerified { return true }\n\tif isTrial && isEmailVerified && isPhoneVerified && isRegionUS { return true }\n\tif isTrial && isAdmin { return false }\n\treturn false\n}"
+  }
+}

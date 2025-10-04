@@ -21,7 +21,7 @@ fn main() {
     println!("Using Encoding16 (auto-selects optimal SIMD strategy)");
 
     let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, N_BITS);
+    let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, N_BITS, OptimizedFor::AutoDetect).unwrap();
     let duration = start.elapsed();
 
     println!("observed DNF: {}", cnf_dnf::dnf_to_string(&dnf));

@@ -25,34 +25,25 @@ fn main() {
 
     // Test 1: Auto-detection (default)
     println!("Test 1: Auto-detection (AutoDetect)");
-    let dnf_auto = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(&cnf, 3);
+    let dnf_auto = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
     println!("  Result: {} terms", dnf_auto.len());
     println!("  DNF: {}\n", cnf_dnf::dnf_to_string(&dnf_auto));
 
     // Test 2: Force X64 scalar
     println!("Test 2: Force X64 scalar");
-    let dnf_x64 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::X64}>(
-        &cnf,
-        3,
-    );
+    let dnf_x64 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::X64).unwrap();
     println!("  Result: {} terms", dnf_x64.len());
     println!("  DNF: {}\n", cnf_dnf::dnf_to_string(&dnf_x64));
 
     // Test 3: Force AVX2 (if available)
     println!("Test 3: Force AVX2_64bits");
-    let dnf_avx2 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::Avx2_64bits}>(
-        &cnf,
-        3,
-    );
+    let dnf_avx2 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::Avx2_64bits).unwrap();
     println!("  Result: {} terms", dnf_avx2.len());
     println!("  DNF: {}\n", cnf_dnf::dnf_to_string(&dnf_avx2));
 
     // Test 4: Force AVX512 (if available)
     println!("Test 4: Force AVX512_64bits");
-    let dnf_avx512 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::Avx512_64bits}>(
-        &cnf,
-        3,
-    );
+    let dnf_avx512 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::Avx512_64bits).unwrap();
     println!("  Result: {} terms", dnf_avx512.len());
     println!("  DNF: {}\n", cnf_dnf::dnf_to_string(&dnf_avx512));
 
@@ -74,20 +65,18 @@ fn main() {
 
     println!("Input CNF: {}", cnf_dnf::cnf_to_string(&cnf_complex));
 
-    // Test with early pruning enabled
-    let dnf_minimal_auto = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, {OptimizedFor::AutoDetect}>(
+    // Test minimal DNF
+    let dnf_minimal_auto = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(
         &cnf_complex,
-        4,
-        true,
-    );
-    println!("  Auto-detect with pruning: {} terms", dnf_minimal_auto.len());
+        4, OptimizedFor::AutoDetect
+    ).unwrap();
+    println!("  Auto-detect minimal: {} terms", dnf_minimal_auto.len());
 
-    let dnf_minimal_x64 = cnf_dnf::convert_cnf_to_dnf_minimal::<Enc64, {OptimizedFor::X64}>(
+    let dnf_minimal_x64 = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(
         &cnf_complex,
-        4,
-        true,
-    );
-    println!("  X64 with pruning: {} terms", dnf_minimal_x64.len());
+        4, OptimizedFor::X64
+    ).unwrap();
+    println!("  X64 minimal: {} terms", dnf_minimal_x64.len());
 
     assert_eq!(
         dnf_minimal_auto, dnf_minimal_x64,

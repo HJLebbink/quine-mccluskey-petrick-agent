@@ -2,7 +2,7 @@
 // This allows working with up to 64 Boolean variables
 
 use qm_agent::qm::random::generate_random_minterms;
-use qm_agent::qm::{reduce_minterms, Enc32, Enc64};
+use qm_agent::qm::{reduce_minterms, Enc64};
 
 fn main() {
 

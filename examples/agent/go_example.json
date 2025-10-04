@@ -1,0 +1,37 @@
+{
+  "variables": {
+    "isValid": "boolean",
+    "hasPermission": "boolean",
+    "isAdmin": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "isValid && hasPermission && isAdmin",
+      "output": "return \"full_access\"",
+      "metadata": {
+        "line": 15,
+        "source": "if isValid && hasPermission && isAdmin { return \"full_access\" }"
+      }
+    },
+    {
+      "condition": "isValid && hasPermission && !isAdmin",
+      "output": "return \"read_access\"",
+      "metadata": {
+        "line": 18,
+        "source": "} else if isValid && hasPermission && !isAdmin { return \"read_access\" }"
+      }
+    },
+    {
+      "condition": "isValid && !hasPermission",
+      "output": "return \"no_access\"",
+      "metadata": {
+        "line": 21
+      }
+    }
+  ],
+  "default": "return \"error\"",
+  "context": {
+    "language": "go",
+    "preserve_order": false
+  }
+}

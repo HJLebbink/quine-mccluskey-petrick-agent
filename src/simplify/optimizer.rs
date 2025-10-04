@@ -1,5 +1,6 @@
 // Optimizer: Apply QM minimization and generate simplified conditions
 
+use crate::{Enc16, Enc32, Enc64};
 use super::types::{BoolExpr, BranchSet, SimplificationResult, TruthTable};
 use crate::qm::QMSolver;
 
@@ -101,41 +102,81 @@ fn simplify_with_integer_vars(
 /// Apply QM minimization for a single output value
 fn minimize_for_output(
     table: &TruthTable,
-    minterms: &[u32],
-    dont_cares: &[u32],
+    minterms: &[u64],
+    dont_cares: &[u64],
 ) -> Result<BoolExpr, String> {
     let var_count = table.variable_count();
 
-    // Use QMSolver from existing module with our variable names
-    use crate::qm::Enc32;
-    let mut solver = QMSolver::<Enc32>::with_variable_names(var_count, table.variables.clone());
+    // Choose encoding based on variable count to avoid unnecessary conversions
+    // Enc16 uses u32 (faster for ≤16 vars), Enc32 uses u64 (needed for >16 vars)
+    if var_count <= 16 {
+        // Use Enc16 (u32) - no conversion needed!
+        let mut solver = QMSolver::<Enc16>::with_variable_names(var_count, table.variables.clone());
 
-    // Convert u32 to u64 for Enc32
-    let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
-    let dont_cares_u64: Vec<u64> = dont_cares.iter().map(|&x| x as u64).collect();
+        solver.set_minterms(minterms.iter().map(|&x| x as u32).collect());
+        solver.set_dont_cares(dont_cares.iter().map(|&x| x as u32).collect());
 
-    solver.set_minterms(&minterms_u64);
-    solver.set_dont_cares(&dont_cares_u64);
+        let result = solver.solve();
 
-    let result = solver.solve();
+        // Convert minimal cover to BoolExpr
+        if result.minimized_expression == "0" {
+            return Err("Contradiction: no valid conditions".to_string());
+        }
 
-    // Convert minimal cover to BoolExpr
-    if result.minimized_expression == "0" {
-        return Err("Contradiction: no valid conditions".to_string());
+        if result.minimized_expression == "1" {
+            // Tautology - always true
+            return Ok(BoolExpr::or(
+                BoolExpr::var(&table.variables[0]),
+                BoolExpr::negate(BoolExpr::var(&table.variables[0])),
+            ));
+        }
+
+        parse_qm_result(&result.minimized_expression, &table.variables)
+    } else if var_count <= 32 {
+        let mut solver = QMSolver::<Enc32>::with_variable_names(var_count, table.variables.clone());
+
+        solver.set_minterms(minterms.to_vec());
+        solver.set_dont_cares(dont_cares.to_vec());
+
+        let result = solver.solve();
+
+        // Convert minimal cover to BoolExpr
+        if result.minimized_expression == "0" {
+            return Err("Contradiction: no valid conditions".to_string());
+        }
+
+        if result.minimized_expression == "1" {
+            // Tautology - always true
+            return Ok(BoolExpr::or(
+                BoolExpr::var(&table.variables[0]),
+                BoolExpr::negate(BoolExpr::var(&table.variables[0])),
+            ));
+        }
+
+        parse_qm_result(&result.minimized_expression, &table.variables)
+    } else {
+        let mut solver = QMSolver::<Enc64>::with_variable_names(var_count, table.variables.clone());
+
+        solver.set_minterms(minterms.iter().map(|&x| x as u128).collect());
+        solver.set_dont_cares(dont_cares.iter().map(|&x| x as u128).collect());
+
+        let result = solver.solve();
+
+        // Convert minimal cover to BoolExpr
+        if result.minimized_expression == "0" {
+            return Err("Contradiction: no valid conditions".to_string());
+        }
+
+        if result.minimized_expression == "1" {
+            // Tautology - always true
+            return Ok(BoolExpr::or(
+                BoolExpr::var(&table.variables[0]),
+                BoolExpr::negate(BoolExpr::var(&table.variables[0])),
+            ));
+        }
+
+        parse_qm_result(&result.minimized_expression, &table.variables)
     }
-
-    if result.minimized_expression == "1" {
-        // Tautology - always true
-        // Return first variable as placeholder (we'll handle this better later)
-        return Ok(BoolExpr::or(
-            BoolExpr::var(&table.variables[0]),
-            BoolExpr::negate(BoolExpr::var(&table.variables[0])),
-        ));
-    }
-
-    // Parse the minimized expression back to BoolExpr
-    // The QM result is like: "AB + A'C + BC"
-    parse_qm_result(&result.minimized_expression, &table.variables)
 }
 
 /// Parse QM output (SOP form) back to BoolExpr

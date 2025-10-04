@@ -1,0 +1,71 @@
+{
+  "variables": {
+    "isOwner": "boolean",
+    "isAdmin": "boolean",
+    "isEditor": "boolean",
+    "isPublic": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "isOwner",
+      "output": "return true",
+      "metadata": {
+        "line": 23,
+        "source": "if isOwner { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin",
+      "output": "return true",
+      "metadata": {
+        "line": 26,
+        "source": "if isAdmin { return true }"
+      }
+    },
+    {
+      "condition": "isOwner && isEditor",
+      "output": "return true",
+      "metadata": {
+        "line": 29,
+        "source": "if isOwner && isEditor { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && isEditor",
+      "output": "return true",
+      "metadata": {
+        "line": 32,
+        "source": "if isAdmin && isEditor { return true }"
+      }
+    },
+    {
+      "condition": "isPublic && isEditor",
+      "output": "return true",
+      "metadata": {
+        "line": 35,
+        "source": "if isPublic && isEditor { return true }"
+      }
+    },
+    {
+      "condition": "isOwner && isPublic",
+      "output": "return true",
+      "metadata": {
+        "line": 38,
+        "source": "if isOwner && isPublic { return true }"
+      }
+    },
+    {
+      "condition": "isAdmin && isPublic",
+      "output": "return true",
+      "metadata": {
+        "line": 41,
+        "source": "if isAdmin && isPublic { return true }"
+      }
+    }
+  ],
+  "default": "return false",
+  "context": {
+    "language": "go",
+    "original_code": "func canAccessDocument(isOwner, isAdmin, isEditor, isPublic bool) bool {\n\tif isOwner {\n\t\treturn true\n\t}\n\tif isAdmin {\n\t\treturn true\n\t}\n\tif isOwner && isEditor {\n\t\treturn true\n\t}\n\tif isAdmin && isEditor {\n\t\treturn true\n\t}\n\tif isPublic && isEditor {\n\t\treturn true\n\t}\n\tif isOwner && isPublic {\n\t\treturn true\n\t}\n\tif isAdmin && isPublic {\n\t\treturn true\n\t}\n\treturn false\n}"
+  }
+}

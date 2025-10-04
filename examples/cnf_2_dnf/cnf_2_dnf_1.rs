@@ -22,7 +22,7 @@ fn main() {
     println!("CNF = {}", cnf_dnf::cnf_to_string(&cnf));
 
     let start = Instant::now();
-    let dnf = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, 8);
+    let dnf = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 8, OptimizedFor::AutoDetect).unwrap();
     let duration = start.elapsed();
 
     println!("DNF = {}", cnf_dnf::dnf_to_string(&dnf));

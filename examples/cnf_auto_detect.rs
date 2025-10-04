@@ -25,15 +25,15 @@ fn main() {
     println!();
 
     // Convert using Encoding16 (for problems with ≤16 variables)
-    let dnf_16 = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    let dnf_16 = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, n_variables, OptimizedFor::AutoDetect).unwrap();
     println!("Encoding16: {} terms (auto-selected Avx512_16bits)", dnf_16.len());
 
     // Convert using Encoding32 (for problems with ≤32 variables)
-    let dnf_32 = cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    let dnf_32 = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, n_variables, OptimizedFor::AutoDetect).unwrap();
     println!("Encoding32: {} terms (auto-selected Avx512_32bits)", dnf_32.len());
 
     // Convert using Encoding64 (for problems with ≤64 variables)
-    let dnf_64 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(&cnf, n_variables);
+    let dnf_64 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, n_variables, OptimizedFor::AutoDetect).unwrap();
     println!("Encoding64: {} terms (auto-selected Avx512_64bits)", dnf_64.len());
     println!();
 

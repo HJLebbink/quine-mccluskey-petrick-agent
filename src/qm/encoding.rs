@@ -4,9 +4,10 @@
 //! for 16-bit (u32), 32-bit (u64), and 64-bit (u128) representations.
 
 use std::fmt;
-use std::ops::{BitAnd, BitOr, BitXor, Not, Shl};
+use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr, Sub};
 
 use crate::cnf_dnf::OptimizedFor;
+use super::simd_gray_code;
 
 /// Trait for integer types that can be used in bit operations
 pub trait BitOps:
@@ -19,6 +20,8 @@ pub trait BitOps:
     + BitXor<Output = Self>
     + Not<Output = Self>
     + Shl<usize, Output = Self>
+    + Shr<usize, Output = Self>
+    + Sub<Output = Self>
     + fmt::Debug
 {
     fn from_u64(val: u64) -> Self;
@@ -29,6 +32,9 @@ pub trait BitOps:
 
     /// Check if bit at position `pos` is set
     fn get_bit(self, pos: usize) -> bool;
+
+    /// Set bit at position `pos` to 1
+    fn set_bit(self, pos: usize) -> Self;
 }
 
 impl BitOps for u32 {
@@ -55,6 +61,10 @@ impl BitOps for u32 {
     #[inline]
     fn get_bit(self, pos: usize) -> bool {
         (self & (1u32 << pos)) != 0
+    }
+    #[inline]
+    fn set_bit(self, pos: usize) -> Self {
+        self | (1u32 << pos)
     }
 }
 
@@ -83,6 +93,10 @@ impl BitOps for u64 {
     fn get_bit(self, pos: usize) -> bool {
         (self & (1u64 << pos)) != 0
     }
+    #[inline]
+    fn set_bit(self, pos: usize) -> Self {
+        self | (1u64 << pos)
+    }
 }
 
 impl BitOps for u128 {
@@ -110,6 +124,10 @@ impl BitOps for u128 {
     fn get_bit(self, pos: usize) -> bool {
         (self & (1u128 << pos)) != 0
     }
+    #[inline]
+    fn set_bit(self, pos: usize) -> Self {
+        self | (1u128 << pos)
+    }
 }
 
 /// Trait defining the encoding scheme for minterms
@@ -134,6 +152,13 @@ pub trait MintermEncoding: Copy + fmt::Debug {
     fn is_compatible_with(of: OptimizedFor) -> bool {
         of.max_bits() >= Self::MAX_VARS
     }
+
+    /// Find gray code pairs using SIMD-optimized implementation
+    fn find_gray_code_pairs(
+        group1_indices: &[usize],
+        group2_indices: &[usize],
+        raw_encodings: &[Self::Value],
+    ) -> Vec<(usize, usize)>;
 }
 
 /// 16-bit encoding: uses u32, supports up to 16 variables
@@ -148,6 +173,14 @@ impl MintermEncoding for Enc16 {
 
     fn recommended_optimized_for() -> OptimizedFor {
         OptimizedFor::Avx512_16bits
+    }
+
+    fn find_gray_code_pairs(
+        group1_indices: &[usize],
+        group2_indices: &[usize],
+        raw_encodings: &[Self::Value],
+    ) -> Vec<(usize, usize)> {
+        simd_gray_code::find_gray_code_pairs_avx512_u32(group1_indices, group2_indices, raw_encodings)
     }
 }
 
@@ -164,6 +197,14 @@ impl MintermEncoding for Enc32 {
     fn recommended_optimized_for() -> OptimizedFor {
         OptimizedFor::Avx512_32bits
     }
+
+    fn find_gray_code_pairs(
+        group1_indices: &[usize],
+        group2_indices: &[usize],
+        raw_encodings: &[Self::Value],
+    ) -> Vec<(usize, usize)> {
+        simd_gray_code::find_gray_code_pairs_avx512_u64(group1_indices, group2_indices, raw_encodings)
+    }
 }
 
 /// 64-bit encoding: uses u128, supports up to 64 variables
@@ -178,5 +219,13 @@ impl MintermEncoding for Enc64 {
 
     fn recommended_optimized_for() -> OptimizedFor {
         OptimizedFor::Avx512_64bits
+    }
+
+    fn find_gray_code_pairs(
+        group1_indices: &[usize],
+        group2_indices: &[usize],
+        raw_encodings: &[Self::Value],
+    ) -> Vec<(usize, usize)> {
+        simd_gray_code::find_gray_code_pairs_avx512_u128(group1_indices, group2_indices, raw_encodings)
     }
 }

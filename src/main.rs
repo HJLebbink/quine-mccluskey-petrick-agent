@@ -2,9 +2,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use regex::Regex;
 use anyhow::{Result, anyhow};
+use qm_agent::agent_api;
 
 /// Quine-McCluskey Boolean minimization agent for Claude
 #[derive(Parser)]
@@ -34,6 +35,16 @@ enum Commands {
         /// Include Product of Sums form
         #[arg(long)]
         include_pos: bool,
+    },
+    /// Simplify if-then-else conditions (for Claude integration)
+    Simplify {
+        /// Input: JSON file path, inline JSON, or stdin (use "-")
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Pretty-print the JSON output
+        #[arg(long)]
+        pretty: bool,
     },
     /// Interactive mode for complex queries
     Interactive,
@@ -77,6 +88,9 @@ fn main() {
     let result = match cli.command {
         Commands::Minimize { input, format, show_steps, include_pos } => {
             handle_minimize(&input, format, show_steps, include_pos)
+        }
+        Commands::Simplify { input, pretty } => {
+            handle_simplify(input.as_deref(), pretty)
         }
         Commands::Interactive => handle_interactive(),
         Commands::Examples => handle_examples(),
@@ -348,8 +362,12 @@ fn print_human_readable(result: &QMResponse) {
     }
 
     println!("\n⭐ Essential Prime Implicants:");
-    for epi in &result.essential_prime_implicants {
-        println!("   • {}", epi);
+    if result.essential_prime_implicants.is_empty() {
+        println!("   • None (no prime implicant uniquely covers any minterm)");
+    } else {
+        for epi in &result.essential_prime_implicants {
+            println!("   • {}", epi);
+        }
     }
 
     if let Some(cost) = result.cost_reduction {
@@ -489,18 +507,58 @@ fn print_examples() {
     println!("   qm-agent interactive");
     println!("   → REPL for iterative problem solving");
 
-    println!("\n🔹 If-Then-Else Simplification:");
-    println!("────────────────────────────────");
-    println!("\nThe library also supports if-then-else simplification with:");
+    println!("\n🔹 If-Then-Else Simplification (Claude Integration):");
+    println!("──────────────────────────────────────────────────");
+    println!("\nSimplify conditional logic via JSON API:");
     println!("• Boolean expression minimization");
     println!("• Dead code detection");
     println!("• Coverage analysis");
     println!("• Integer comparison operators (==, <, >, <=, >=, !=)");
+    println!("• Multi-language code generation (Go, Rust, C++, Python)");
 
-    println!("\nRun these examples:");
+    println!("\n10. From JSON file:");
+    println!("   qm-agent simplify -i examples/agent/simple.json");
+
+    println!("\n11. From stdin:");
+    println!("   echo '{{...}}' | qm-agent simplify");
+
+    println!("\n12. Inline JSON:");
+    println!("   qm-agent simplify -i '{{\"variables\": {{\"a\": \"boolean\"}}, \"branches\": [...]}}'");
+
+    println!("\nRun library examples:");
     println!("   cargo run --example simplify_if_then_else");
     println!("   cargo run --example dead_code_detection");
     println!("   cargo run --example comparison_operators");
 
-    println!("\nSee examples/ directory for full code samples.");
+    println!("\nSee examples/agent/ directory for JSON API samples.");
+}
+
+fn handle_simplify(input: Option<&str>, _pretty: bool) -> Result<()> {
+    // Read input from stdin, file, or inline
+    let json_input = match input {
+        None | Some("-") => {
+            // Read from stdin
+            let mut buffer = String::new();
+            io::stdin().read_to_string(&mut buffer)?;
+            buffer
+        }
+        Some(path_or_json) => {
+            // Try to read as file first
+            if fs::metadata(path_or_json).is_ok() {
+                fs::read_to_string(path_or_json)?
+            } else {
+                // Treat as inline JSON
+                path_or_json.to_string()
+            }
+        }
+    };
+
+    // Process through agent API
+    match agent_api::simplify_from_json(&json_input) {
+        Ok(response) => {
+            println!("{}", response);
+            Ok(())
+        }
+        Err(e) => Err(anyhow!("Simplification error: {}", e)),
+    }
 }

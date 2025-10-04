@@ -154,9 +154,9 @@ unsafe fn optimized_for_avx512_epi32_internal(result_dnf_next: &[u32], z: u32) -
 #[target_feature(enable = "avx512f")]
 unsafe fn optimized_for_avx512_epi64_internal(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     const NB: usize = 3; // log2(8)
-    let mut index_to_delete = Vec::with_capacity(8);
 
     let n = result_dnf_next.len();
+    let mut index_to_delete = Vec::with_capacity(n << NB);
     let n_blocks = n >> NB;
 
     unsafe {
@@ -165,11 +165,10 @@ unsafe fn optimized_for_avx512_epi64_internal(result_dnf_next: &[u64], z: u64) -
 
         for block in 0..n_blocks {
             let q = _mm512_loadu_si512(ptr.add(block));
-            let p = _mm512_or_si512(z2, q);
+            let p = _mm512_or_si512(q, z2);
 
-            let mask1 = _mm512_cmpeq_epi64_mask(p, z2);
-            if mask1 != 0 {
-                return (Vec::new(), false);
+            if _mm512_cmpeq_epi64_mask(p, z2) != 0 {
+                return (Vec::with_capacity(0), false);
             }
 
             let mask2 = _mm512_cmpeq_epi64_mask(p, q);
@@ -231,7 +230,6 @@ unsafe fn optimized_for_avx2_epi64_internal(result_dnf_next: &[u64], z: u64) -> 
 #[cfg(target_arch = "x86_64")]
 pub fn run_avx512_64bits(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     if is_x86_feature_detected!("avx512f") {
-        // No type conversion needed - u64 is processed natively
         unsafe { optimized_for_avx512_epi64_internal(result_dnf_next, z) }
     } else {
         super::convert::optimized_for_x64(result_dnf_next, z)

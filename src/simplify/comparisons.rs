@@ -61,7 +61,7 @@ pub fn build_truth_table_with_comparisons(
         ));
     }
 
-    let mut output_groups: HashMap<String, Vec<u32>> = HashMap::new();
+    let mut output_groups: HashMap<String, Vec<u64>> = HashMap::new();
     let mut dont_cares = Vec::new();
 
     // Enumerate all combinations
@@ -70,7 +70,7 @@ pub fn build_truth_table_with_comparisons(
         .map(|v| var_types[v].min_value())
         .collect();
 
-    for minterm_idx in 0..total_combinations as u32 {
+    for minterm_idx in 0..total_combinations as u64 {
         // Build assignment maps
         let mut bool_assignments = HashMap::new();
         let mut int_assignments = HashMap::new();

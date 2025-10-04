@@ -21,15 +21,15 @@ fn main() {
     println!("Encoding-aware API (automatic optimization selection):");
 
     // For small problems (≤16 variables), use Encoding16
-    let dnf_16 = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, 3);
+    let dnf_16 = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
     println!("  Encoding16: {} terms (auto-selected Avx512_16bits)", dnf_16.len());
 
     // For medium problems (≤32 variables), use Encoding32
-    let dnf_32 = cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(&cnf, 3);
+    let dnf_32 = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
     println!("  Encoding32: {} terms (auto-selected Avx512_32bits)", dnf_32.len());
 
     // For large problems (≤64 variables), use Encoding64
-    let dnf_64 = cnf_dnf::convert_cnf_to_dnf::<Enc64, {OptimizedFor::AutoDetect}>(&cnf, 3);
+    let dnf_64 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
     println!("  Encoding64: {} terms (auto-selected Avx512_64bits)", dnf_64.len());
 
     // All encodings produce the same result!
@@ -43,17 +43,17 @@ fn main() {
     println!("\n=== Type Safety Demo ===\n");
 
     // This works - 8 variables fits in Encoding16
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, 8);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 8, OptimizedFor::AutoDetect).unwrap();
     println!("8 variables with Encoding16: ✓ {} terms", result.len());
 
     // This fails - 20 variables exceeds Encoding16 (max 16)
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, 20);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 20, OptimizedFor::AutoDetect).unwrap();
     if result.is_empty() {
         println!("20 variables with Encoding16: ✗ Validation failed (expected)");
     }
 
     // This works - 20 variables fits in Encoding32
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc32, {OptimizedFor::AutoDetect}>(&cnf, 20);
+    let result = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, 20, OptimizedFor::AutoDetect).unwrap();
     println!("20 variables with Encoding32: ✓ {result} terms", result = if !result.is_empty() { format!("{}", result.len()) } else { "0".to_string() });
 
     println!("\n=== Benefits ===");

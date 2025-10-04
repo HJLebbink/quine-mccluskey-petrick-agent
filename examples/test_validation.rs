@@ -10,22 +10,22 @@ fn main() {
 
     // This should work: 8 bits with Avx512_8bits
     println!("Test 1: 8 variables with Avx512_8bits (should work)");
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::Avx512_8bits}>(&cnf, 8);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 8, OptimizedFor::Avx512_8bits).unwrap();
     println!("  Result: {} terms\n", result.len());
 
     // This should fail: 16 bits with Avx512_8bits (max 8)
     println!("Test 2: 16 variables with Avx512_8bits (should fail)");
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::Avx512_8bits}>(&cnf, 16);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 16, OptimizedFor::Avx512_8bits).unwrap();
     println!("  Result: {} terms (empty = validation failed)\n", result.len());
 
     // This should work: 16 bits with Avx512_16bits
     println!("Test 3: 16 variables with Avx512_16bits (should work)");
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::Avx512_16bits}>(&cnf, 16);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 16, OptimizedFor::Avx512_16bits).unwrap();
     println!("  Result: {} terms\n", result.len());
 
     // This should work: AutoDetect always works (selects appropriate level)
     println!("Test 4: 16 variables with AutoDetect (should work)");
-    let result = cnf_dnf::convert_cnf_to_dnf::<Enc16, {OptimizedFor::AutoDetect}>(&cnf, 16);
+    let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 16, OptimizedFor::AutoDetect).unwrap();
     println!("  Result: {} terms\n", result.len());
 
     println!("=== Validation tests complete ===");

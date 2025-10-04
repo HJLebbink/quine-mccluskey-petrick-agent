@@ -1,0 +1,54 @@
+{
+  "variables": {
+    "isAuthenticated": "boolean",
+    "hasValidToken": "boolean",
+    "isRateLimited": "boolean"
+  },
+  "branches": [
+    {
+      "condition": "!isAuthenticated",
+      "output": "return http.StatusUnauthorized",
+      "metadata": {
+        "line": 45,
+        "source": "if !isAuthenticated { return http.StatusUnauthorized }"
+      }
+    },
+    {
+      "condition": "!isAuthenticated && !hasValidToken",
+      "output": "return http.StatusUnauthorized",
+      "metadata": {
+        "line": 48,
+        "source": "if !isAuthenticated && !hasValidToken { return http.StatusUnauthorized }"
+      }
+    },
+    {
+      "condition": "!hasValidToken && !isAuthenticated",
+      "output": "return http.StatusUnauthorized",
+      "metadata": {
+        "line": 51,
+        "source": "if !hasValidToken && !isAuthenticated { return http.StatusUnauthorized }"
+      }
+    },
+    {
+      "condition": "isAuthenticated && hasValidToken && isRateLimited",
+      "output": "return http.StatusTooManyRequests",
+      "metadata": {
+        "line": 54,
+        "source": "if isAuthenticated && hasValidToken && isRateLimited { return http.StatusTooManyRequests }"
+      }
+    },
+    {
+      "condition": "isAuthenticated && hasValidToken && !isRateLimited",
+      "output": "return http.StatusOK",
+      "metadata": {
+        "line": 57,
+        "source": "if isAuthenticated && hasValidToken && !isRateLimited { return http.StatusOK }"
+      }
+    }
+  ],
+  "default": "return http.StatusInternalServerError",
+  "context": {
+    "language": "go",
+    "original_code": "func validateAPIRequest(isAuthenticated, hasValidToken, isRateLimited bool) int {\n\tif !isAuthenticated {\n\t\treturn http.StatusUnauthorized\n\t}\n\tif !isAuthenticated && !hasValidToken {\n\t\treturn http.StatusUnauthorized\n\t}\n\tif !hasValidToken && !isAuthenticated {\n\t\treturn http.StatusUnauthorized\n\t}\n\tif isAuthenticated && hasValidToken && isRateLimited {\n\t\treturn http.StatusTooManyRequests\n\t}\n\tif isAuthenticated && hasValidToken && !isRateLimited {\n\t\treturn http.StatusOK\n\t}\n\treturn http.StatusInternalServerError\n}"
+  }
+}

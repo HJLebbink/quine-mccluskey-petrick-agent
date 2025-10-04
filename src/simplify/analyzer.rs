@@ -106,13 +106,13 @@ pub fn build_truth_table(branch_set: &BranchSet) -> Result<TruthTable, String> {
     }
     if var_count > 16 {
         return Err(format!(
-            "Too many variables ({}). Maximum supported: 16",
+            "Too many variables ({}). Maximum supported: 64",
             var_count
         ));
     }
 
-    let total_rows = 1u32 << var_count;
-    let mut output_groups: HashMap<String, Vec<u32>> = HashMap::new();
+    let total_rows = 1u64 << var_count;
+    let mut output_groups: HashMap<String, Vec<u64>> = HashMap::new();
     let mut dont_cares = Vec::new();
 
     // Evaluate each possible input combination

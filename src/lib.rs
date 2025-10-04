@@ -9,6 +9,7 @@
 pub mod qm;        // Quine-McCluskey algorithm and solver
 pub mod cnf_dnf;   // CNF to DNF conversion with SIMD
 pub mod simplify;  // If-then-else simplification
+pub mod agent_api; // JSON API for Claude integration
 
 // Re-export the main types
 pub use qm::{QMSolver, QMResult};
@@ -20,8 +21,8 @@ pub use qm::{Enc16, Enc32, Enc64};
 ///
 /// Automatically selects the most efficient encoding:
 /// - Enc16 (u32 storage) for up to 16 variables
-/// - Enc32 (u64 storage) for 17-32 variables
-/// - Enc64 (u128 storage) for 33-64 variables
+/// - Enc32 (u64 storage) for up to 32 variables
+/// - Enc64 (u128 storage) for up to 64 variables
 pub fn minimize_function(
     minterms: &[u64],
     dont_cares: Option<&[u64]>,
@@ -30,38 +31,40 @@ pub fn minimize_function(
     if variables <= 16 {
         // Use Enc16 with u32 storage
         let mut solver = QMSolver::<Enc16>::new(variables);
+        type Value = <Enc16 as qm::encoding::MintermEncoding>::Value;
 
         // Convert u64 to u32 for Enc16
-        let minterms_u32: Vec<u32> = minterms.iter().map(|&x| x as u32).collect();
-        solver.set_minterms(&minterms_u32);
+        let minterms_u32: Vec<Value> = minterms.iter().map(|&x| x as Value).collect();
+        solver.set_minterms(minterms_u32);
 
         if let Some(dc) = dont_cares {
-            let dc_u32: Vec<u32> = dc.iter().map(|&x| x as u32).collect();
-            solver.set_dont_cares(&dc_u32);
+            let dc_u32: Vec<Value> = dc.iter().map(|&x| x as Value).collect();
+            solver.set_dont_cares(dc_u32);
         }
 
         solver.solve()
     } else if variables <= 32 {
         // Use Enc32 with u64 storage
         let mut solver = QMSolver::<Enc32>::new(variables);
-        solver.set_minterms(minterms);
+        solver.set_minterms(minterms.to_vec());
 
         if let Some(dc) = dont_cares {
-            solver.set_dont_cares(dc);
+            solver.set_dont_cares(dc.to_vec());
         }
 
         solver.solve()
     } else if variables <= 64 {
         // Use Enc64 with u128 storage
         let mut solver = QMSolver::<Enc64>::new(variables);
+        type Value = <Enc64 as qm::encoding::MintermEncoding>::Value;
 
         // Convert u64 to u128 for Enc64
-        let minterms_u128: Vec<u128> = minterms.iter().map(|&x| x as u128).collect();
-        solver.set_minterms(&minterms_u128);
+        let minterms_u128: Vec<Value> = minterms.iter().map(|&x| x as Value).collect();
+        solver.set_minterms(minterms_u128);
 
         if let Some(dc) = dont_cares {
-            let dc_u128: Vec<u128> = dc.iter().map(|&x| x as u128).collect();
-            solver.set_dont_cares(&dc_u128);
+            let dc_u128: Vec<Value> = dc.iter().map(|&x| x as Value).collect();
+            solver.set_dont_cares(dc_u128);
         }
 
         solver.solve()
