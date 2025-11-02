@@ -46,9 +46,16 @@ impl<E: MintermEncoding> PetricksMethod<E> {
     /// SIMD-accelerated minimal cover using pre-computed coverage matrix
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     unsafe fn find_minimal_cover_simd(&self) -> Vec<Implicant<E>> {
+        let num_bits = self.get_num_bits();
+
         // Build coverage matrix using SIMD (bit-packed)
+        // Dispatch to appropriate bit-width implementation
         let coverage_matrix = unsafe {
-            simd_coverage::build_coverage_matrix_simd_4bit(&self.prime_implicants, &self.minterms)
+            match num_bits {
+                0..=4 => simd_coverage::build_coverage_matrix_simd_4bit(&self.prime_implicants, &self.minterms),
+                5 => simd_coverage::build_coverage_matrix_simd_5bit(&self.prime_implicants, &self.minterms),
+                _ => unreachable!("should_use_simd guards against >5 bits"),
+            }
         };
 
         // Greedy selection using pre-computed matrix

@@ -6,6 +6,66 @@
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+/// AVX512 version for u32 (processes 16 at a time)
+/// Returns vector of (i, j) pairs that are gray codes
+#[cfg(target_arch = "x86_64")]
+pub fn find_gray_code_pairs_avx512_u32(
+    group1_indices: &[usize],
+    group2_indices: &[usize],
+    raw_encodings: &[u32],
+) -> Vec<(usize, usize)> {
+    const LANES: usize = 16; // ZMM holds 16x u32
+
+    if !is_x86_feature_detected!("avx512f") || !is_x86_feature_detected!("avx512vpopcntdq") {
+        return find_gray_code_pairs_ref(group1_indices, group2_indices, raw_encodings);
+    }
+
+    let mut pairs = Vec::new();
+    let group2_values: Vec<u32> = group2_indices.iter()
+        .map(|&idx| raw_encodings[idx])
+        .collect();
+
+    unsafe {
+        let ones = _mm512_set1_epi32(1);
+
+        for &i_idx in group1_indices {
+            let raw_i: u32 = raw_encodings[i_idx];
+            let raw_i_vec = _mm512_set1_epi32(raw_i as i32);
+
+            let mut j_pos = 0;
+
+            while j_pos + LANES <= group2_values.len() {
+                let raw_j_vec = _mm512_loadu_epi32(group2_values.as_ptr().add(j_pos) as *const i32);
+                let xor_vec = _mm512_xor_epi32(raw_i_vec, raw_j_vec);
+                let popcount_vec = _mm512_popcnt_epi32(xor_vec);
+                let mask = _mm512_cmpeq_epi32_mask(popcount_vec, ones);
+
+                if mask != 0 {
+                    for lane in 0..LANES {
+                        if (mask & (1 << lane)) != 0 {
+                            let j_idx = group2_indices[j_pos + lane];
+                            pairs.push((i_idx, j_idx));
+                        }
+                    }
+                }
+
+                j_pos += LANES;
+            }
+
+            while j_pos < group2_values.len() {
+                let j_idx = group2_indices[j_pos];
+                let raw_j = raw_encodings[j_idx];
+                if (raw_i ^ raw_j).count_ones() == 1 {
+                    pairs.push((i_idx, j_idx));
+                }
+                j_pos += 1;
+            }
+        }
+    }
+
+    pairs
+}
+
 /// Process gray code checks in batches using AVX512
 /// Returns vector of (i, j) pairs that are gray codes
 #[cfg(target_arch = "x86_64")]
@@ -18,7 +78,7 @@ pub fn find_gray_code_pairs_avx512_u64(
 
     if !is_x86_feature_detected!("avx512f") || !is_x86_feature_detected!("avx512vpopcntdq") {
         // Fallback to scalar
-        return find_gray_code_pairs_scalar_u64(group1_indices, group2_indices, raw_encodings);
+        return find_gray_code_pairs_ref(group1_indices, group2_indices, raw_encodings);
     }
 
     let mut pairs = Vec::new();
@@ -78,65 +138,9 @@ pub fn find_gray_code_pairs_avx512_u64(
     pairs
 }
 
-/// AVX512 version for u32 (processes 16 at a time)
-#[cfg(target_arch = "x86_64")]
-pub fn find_gray_code_pairs_avx512_u32(
-    group1_indices: &[usize],
-    group2_indices: &[usize],
-    raw_encodings: &[u32],
-) -> Vec<(usize, usize)> {
-    const LANES: usize = 16; // ZMM holds 16x u32
-
-    if !is_x86_feature_detected!("avx512f") || !is_x86_feature_detected!("avx512vpopcntdq") {
-        return find_gray_code_pairs_scalar_u32(group1_indices, group2_indices, raw_encodings);
-    }
-
-    let mut pairs = Vec::new();
-    let group2_values: Vec<u32> = group2_indices.iter()
-        .map(|&idx| raw_encodings[idx])
-        .collect();
-
-    unsafe {
-        for &i_idx in group1_indices {
-            let raw_i = raw_encodings[i_idx];
-            let raw_i_vec = _mm512_set1_epi32(raw_i as i32);
-            let ones = _mm512_set1_epi32(1);
-
-            let mut j_pos = 0;
-
-            while j_pos + LANES <= group2_values.len() {
-                let raw_j_vec = _mm512_loadu_epi32(group2_values.as_ptr().add(j_pos) as *const i32);
-                let xor_vec = _mm512_xor_epi32(raw_i_vec, raw_j_vec);
-                let popcount_vec = _mm512_popcnt_epi32(xor_vec);
-                let mask = _mm512_cmpeq_epi32_mask(popcount_vec, ones);
-
-                if mask != 0 {
-                    for lane in 0..LANES {
-                        if (mask & (1 << lane)) != 0 {
-                            let j_idx = group2_indices[j_pos + lane];
-                            pairs.push((i_idx, j_idx));
-                        }
-                    }
-                }
-
-                j_pos += LANES;
-            }
-
-            while j_pos < group2_values.len() {
-                let j_idx = group2_indices[j_pos];
-                let raw_j = raw_encodings[j_idx];
-                if (raw_i ^ raw_j).count_ones() == 1 {
-                    pairs.push((i_idx, j_idx));
-                }
-                j_pos += 1;
-            }
-        }
-    }
-
-    pairs
-}
 
 /// AVX512 version for u128 (processes 4 pairs of u64 at a time)
+/// Returns vector of (i, j) pairs that are gray codes
 #[cfg(target_arch = "x86_64")]
 pub fn find_gray_code_pairs_avx512_u128(
     group1_indices: &[usize],
@@ -146,7 +150,7 @@ pub fn find_gray_code_pairs_avx512_u128(
     const LANES: usize = 4; // Process 4x u128 as 8x u64
 
     if !is_x86_feature_detected!("avx512f") || !is_x86_feature_detected!("avx512vpopcntdq") {
-        return find_gray_code_pairs_scalar_u128(group1_indices, group2_indices, raw_encodings);
+        return find_gray_code_pairs_ref(group1_indices, group2_indices, raw_encodings);
     }
 
     let mut pairs = Vec::new();
@@ -220,11 +224,11 @@ pub fn find_gray_code_pairs_avx512_u128(
     pairs
 }
 
-// Scalar fallbacks
-fn find_gray_code_pairs_scalar_u64(
+/// Finds all (i, j) pairs where encodings[i] and encodings[j] differ by exactly one bit.
+pub fn find_gray_code_pairs_ref<T: crate::qm::encoding::BitOps>(
     group1_indices: &[usize],
     group2_indices: &[usize],
-    raw_encodings: &[u64],
+    raw_encodings: &[T],
 ) -> Vec<(usize, usize)> {
     let mut pairs = Vec::new();
     for &i in group1_indices {
@@ -239,49 +243,40 @@ fn find_gray_code_pairs_scalar_u64(
     pairs
 }
 
-fn find_gray_code_pairs_scalar_u32(
+/// Uses FxHash (fast integer hash) instead of SipHash for 3× speedup.
+/// Uses FxHashMap to map encoding values to their indices for O(1) lookup.
+pub fn find_gray_code_pairs_fxhash<T: crate::qm::encoding::BitOps>(
     group1_indices: &[usize],
     group2_indices: &[usize],
-    raw_encodings: &[u32],
+    raw_encodings: &[T],
 ) -> Vec<(usize, usize)> {
+    use rustc_hash::FxHashMap;
+
+    // Build a mapping from encoding value to index for group2
+    // Note: Uses more memory than HashSet but provides O(1) index lookup
+    let mut value_to_index: FxHashMap<T, usize> = FxHashMap::with_capacity_and_hasher(
+        group2_indices.len(),
+        Default::default()
+    );
+    for &j in group2_indices {
+        value_to_index.insert(raw_encodings[j], j);
+    }
+
     let mut pairs = Vec::new();
+
     for &i in group1_indices {
         let raw_i = raw_encodings[i];
-        for &j in group2_indices {
-            let raw_j = raw_encodings[j];
-            if (raw_i ^ raw_j).count_ones() == 1 {
-                pairs.push((i, j));
+        let mut unset_bits = !raw_i;
+        while unset_bits != T::zero() {
+            let bit = unset_bits.trailing_zeros();
+            let candidate = raw_i | (T::one() << bit as usize);
+            if let Some(&j_idx) = value_to_index.get(&candidate) {
+                pairs.push((i, j_idx));
             }
+            unset_bits = unset_bits & (unset_bits - T::one());
         }
     }
     pairs
-}
-
-fn find_gray_code_pairs_scalar_u128(
-    group1_indices: &[usize],
-    group2_indices: &[usize],
-    raw_encodings: &[u128],
-) -> Vec<(usize, usize)> {
-    let mut pairs = Vec::new();
-    for &i in group1_indices {
-        let raw_i = raw_encodings[i];
-        for &j in group2_indices {
-            let raw_j = raw_encodings[j];
-            if (raw_i ^ raw_j).count_ones() == 1 {
-                pairs.push((i, j));
-            }
-        }
-    }
-    pairs
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-pub fn find_gray_code_pairs_avx512_u64(
-    group1_indices: &[usize],
-    group2_indices: &[usize],
-    raw_encodings: &[u64],
-) -> Vec<(usize, usize)> {
-    find_gray_code_pairs_scalar_u64(group1_indices, group2_indices, raw_encodings)
 }
 
 #[cfg(not(target_arch = "x86_64"))]
@@ -291,6 +286,15 @@ pub fn find_gray_code_pairs_avx512_u32(
     raw_encodings: &[u32],
 ) -> Vec<(usize, usize)> {
     find_gray_code_pairs_scalar_u32(group1_indices, group2_indices, raw_encodings)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub fn find_gray_code_pairs_avx512_u64(
+    group1_indices: &[usize],
+    group2_indices: &[usize],
+    raw_encodings: &[u64],
+) -> Vec<(usize, usize)> {
+    find_gray_code_pairs_scalar_u64(group1_indices, group2_indices, raw_encodings)
 }
 
 #[cfg(not(target_arch = "x86_64"))]

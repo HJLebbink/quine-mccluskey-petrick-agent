@@ -29,7 +29,7 @@
 pub mod implicant;
 pub mod quine_mccluskey;
 pub mod petricks_method;
-pub mod simd_gray_code;
+pub mod gray_code;
 pub mod simd_coverage;
 
 // High-level interface

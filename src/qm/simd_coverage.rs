@@ -176,8 +176,8 @@ const SIMD_THRESHOLD: usize = 1024;
 
 /// Check if SIMD acceleration is available and worthwhile
 pub fn should_use_simd(num_checks: usize, num_bits: usize) -> bool {
-    // Only supports 4-bit for now
-    if num_bits > 4 {
+    // Supports 4-bit and 5-bit
+    if num_bits > 5 || num_bits < 1 {
         return false;
     }
 
@@ -314,6 +314,134 @@ unsafe fn check_coverage_batch_4bit(
     }
 }
 
+/// Build coverage matrix using SIMD acceleration (5-bit version)
+///
+/// For each prime implicant, checks which minterms it covers by processing
+/// 512 minterms at a time using AVX-512.
+///
+/// Returns: CoverageMatrix with bit-packed storage where [i][j] = true if prime_implicant[i] covers minterm[j]
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub unsafe fn build_coverage_matrix_simd_5bit<E: MintermEncoding>(
+    prime_implicants: &[Implicant<E>],
+    minterms: &[E::Value],
+) -> CoverageMatrix {
+    let num_pi = prime_implicants.len();
+    let num_mt = minterms.len();
+
+    // Initialize result matrix (bit-packed)
+    let mut coverage_matrix = CoverageMatrix::new(num_pi, num_mt);
+
+    // Convert minterms to u8
+    let minterms_u8: Vec<u8> = minterms
+        .iter()
+        .map(|&mt| mt.to_u64() as u8)
+        .collect();
+
+    // Process minterms in batches of 512
+    let num_batches = (num_mt + 511) / 512;
+    let padded_size = num_batches * 512;
+
+    // Pad minterms to multiple of 512
+    let mut padded_minterms = minterms_u8;
+    padded_minterms.resize(padded_size, 0);
+
+    // For each prime implicant
+    for (pi_idx, pi) in prime_implicants.iter().enumerate() {
+        // Extract implicant value and don't care mask
+        let (implicant_value, dont_care_mask) = extract_implicant_representation(pi);
+
+        // Check coverage for all minterms (512 at a time)
+        for batch_idx in 0..num_batches {
+            let offset = batch_idx * 512;
+
+            // Prepare inputs for 512 coverage checks
+            let coverage_bits = unsafe {
+                check_coverage_batch_5bit(
+                    implicant_value,
+                    dont_care_mask,
+                    &padded_minterms[offset..offset + 512],
+                )
+            };
+
+            // Store results directly to coverage matrix (optimized bulk write)
+            // Convert from striped layout to consecutive and write directly
+            let coverage_array: [u8; 64] = coverage_bits.try_into().expect("Vec should be 64 bytes");
+            coverage_matrix.write_striped_bits(pi_idx, offset, &coverage_array);
+        }
+    }
+
+    coverage_matrix
+}
+
+/// Check coverage for a batch of 512 minterms (5-bit version)
+///
+/// Returns: 64 bytes where bits indicate coverage (512 bits total)
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+unsafe fn check_coverage_batch_5bit(
+    implicant_value: u8,
+    dont_care_mask: u8,
+    minterms: &[u8], // Must be exactly 512 values
+) -> Vec<u8> {
+    use bitwise_simd::bit_plane::bps_gfni_8to8;
+    use bitwise_simd::generated::_mm512_covers_5_5_5_1::_mm512_covers_5_5_5_1;
+    use std::arch::x86_64::*;
+
+    assert_eq!(minterms.len(), 512);
+
+    unsafe {
+        // Broadcast implicant and mask to 512 values
+        let implicant_bytes = vec![implicant_value; 512];
+        let mask_bytes = vec![dont_care_mask; 512];
+
+        // Load into ZMM registers (8 registers × 64 bytes = 512 bytes)
+        let mut implicant_regs = [_mm512_setzero_si512(); 8];
+        let mut mask_regs = [_mm512_setzero_si512(); 8];
+        let mut minterm_regs = [_mm512_setzero_si512(); 8];
+
+        for reg in 0..8 {
+            implicant_regs[reg] =
+                _mm512_loadu_si512(implicant_bytes[reg * 64..].as_ptr() as *const __m512i);
+            mask_regs[reg] = _mm512_loadu_si512(mask_bytes[reg * 64..].as_ptr() as *const __m512i);
+            minterm_regs[reg] =
+                _mm512_loadu_si512(minterms[reg * 64..].as_ptr() as *const __m512i);
+        }
+
+        // Separate into bit planes (use 8to8 and take first 5 planes)
+        let mut implicant_planes_full = [_mm512_setzero_si512(); 8];
+        let mut mask_planes_full = [_mm512_setzero_si512(); 8];
+        let mut minterm_planes_full = [_mm512_setzero_si512(); 8];
+
+        bps_gfni_8to8(&implicant_regs, &mut implicant_planes_full);
+        bps_gfni_8to8(&mask_regs, &mut mask_planes_full);
+        bps_gfni_8to8(&minterm_regs, &mut minterm_planes_full);
+
+        // Take only first 5 planes for 5-bit values
+        let mut implicant_planes = [_mm512_setzero_si512(); 5];
+        let mut mask_planes = [_mm512_setzero_si512(); 5];
+        let mut minterm_planes = [_mm512_setzero_si512(); 5];
+
+        implicant_planes.copy_from_slice(&implicant_planes_full[0..5]);
+        mask_planes.copy_from_slice(&mask_planes_full[0..5]);
+        minterm_planes.copy_from_slice(&minterm_planes_full[0..5]);
+
+        // Combine into input array: [minterm bits, mask bits, implicant bits]
+        let mut input = [_mm512_setzero_si512(); 15];
+        input[0..5].copy_from_slice(&minterm_planes);
+        input[5..10].copy_from_slice(&mask_planes);
+        input[10..15].copy_from_slice(&implicant_planes);
+
+        // Execute coverage check for all 512 values
+        let mut output = [_mm512_setzero_si512(); 1];
+        _mm512_covers_5_5_5_1(&input, &mut output);
+
+        // Extract results (512 bits packed in one ZMM register)
+        let mut result = vec![0u8; 64];
+        _mm512_storeu_si512(result.as_mut_ptr() as *mut __m512i, output[0]);
+
+        result
+    }
+}
+
 /// Extract implicant representation for coverage checking
 ///
 /// Returns: (implicant_value, dont_care_mask)
@@ -373,12 +501,15 @@ mod tests {
         // Small problem: should not use SIMD
         assert!(!should_use_simd(100, 4));
 
-        // Large problem: might use SIMD (if hardware supports it)
-        let should_use = should_use_simd(10000, 4);
-        // Can't assert true/false since depends on CPU features
-        println!("SIMD available for large problem: {}", should_use);
+        // Large 4-bit problem: might use SIMD (if hardware supports it)
+        let should_use_4bit = should_use_simd(10000, 4);
+        println!("SIMD available for large 4-bit problem: {}", should_use_4bit);
 
-        // 5-bit problem: not supported
-        assert!(!should_use_simd(10000, 5));
+        // Large 5-bit problem: might use SIMD (if hardware supports it)
+        let should_use_5bit = should_use_simd(10000, 5);
+        println!("SIMD available for large 5-bit problem: {}", should_use_5bit);
+
+        // 6-bit problem: not supported
+        assert!(!should_use_simd(10000, 6));
     }
 }

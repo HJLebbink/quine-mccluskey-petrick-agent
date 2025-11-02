@@ -21,6 +21,7 @@ regex = "1.11"
 anyhow = "1.0"
 rand = "0.9.2"
 bitwise-simd = { path = "C:/Source/Private/rust/bitwise-rust-agent/bitwise-simd", optional = true }
+rustc-hash = "2.1.1"
 
 [features]
 default = ["simd"]
@@ -39,3 +40,8 @@ harness = false
 [[bench]]
 name = "encoding_bench"
 harness = false
+
+[[bench]]
+name = "gray_code_bench"
+harness = false
+

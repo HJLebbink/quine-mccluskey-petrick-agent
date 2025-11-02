@@ -7,7 +7,7 @@ use std::fmt;
 use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr, Sub};
 
 use crate::cnf_dnf::OptimizedFor;
-use super::simd_gray_code;
+use super::gray_code;
 
 /// Trait for integer types that can be used in bit operations
 pub trait BitOps:
@@ -27,6 +27,7 @@ pub trait BitOps:
     fn from_u64(val: u64) -> Self;
     fn to_u64(self) -> u64;
     fn count_ones(self) -> u32;
+    fn trailing_zeros(self) -> u32;
     fn zero() -> Self;
     fn one() -> Self;
 
@@ -49,6 +50,10 @@ impl BitOps for u32 {
     #[inline]
     fn count_ones(self) -> u32 {
         self.count_ones()
+    }
+    #[inline]
+    fn trailing_zeros(self) -> u32 {
+        self.trailing_zeros()
     }
     #[inline]
     fn zero() -> Self {
@@ -82,6 +87,10 @@ impl BitOps for u64 {
         self.count_ones()
     }
     #[inline]
+    fn trailing_zeros(self) -> u32 {
+        self.trailing_zeros()
+    }
+    #[inline]
     fn zero() -> Self {
         0u64
     }
@@ -111,6 +120,10 @@ impl BitOps for u128 {
     #[inline]
     fn count_ones(self) -> u32 {
         self.count_ones()
+    }
+    #[inline]
+    fn trailing_zeros(self) -> u32 {
+        self.trailing_zeros()
     }
     #[inline]
     fn zero() -> Self {
@@ -180,7 +193,8 @@ impl MintermEncoding for Enc16 {
         group2_indices: &[usize],
         raw_encodings: &[Self::Value],
     ) -> Vec<(usize, usize)> {
-        simd_gray_code::find_gray_code_pairs_avx512_u32(group1_indices, group2_indices, raw_encodings)
+        gray_code::find_gray_code_pairs_fxhash(group1_indices, group2_indices, raw_encodings)
+        //gray_code::find_gray_code_pairs_avx512_u32(group1_indices, group2_indices, raw_encodings)
     }
 }
 
@@ -203,7 +217,8 @@ impl MintermEncoding for Enc32 {
         group2_indices: &[usize],
         raw_encodings: &[Self::Value],
     ) -> Vec<(usize, usize)> {
-        simd_gray_code::find_gray_code_pairs_avx512_u64(group1_indices, group2_indices, raw_encodings)
+        gray_code::find_gray_code_pairs_fxhash(group1_indices, group2_indices, raw_encodings)
+        //gray_code::find_gray_code_pairs_avx512_u64(group1_indices, group2_indices, raw_encodings)
     }
 }
 
@@ -226,6 +241,7 @@ impl MintermEncoding for Enc64 {
         group2_indices: &[usize],
         raw_encodings: &[Self::Value],
     ) -> Vec<(usize, usize)> {
-        simd_gray_code::find_gray_code_pairs_avx512_u128(group1_indices, group2_indices, raw_encodings)
+        gray_code::find_gray_code_pairs_fxhash(group1_indices, group2_indices, raw_encodings)
+        //gray_code::find_gray_code_pairs_avx512_u128(group1_indices, group2_indices, raw_encodings)
     }
 }

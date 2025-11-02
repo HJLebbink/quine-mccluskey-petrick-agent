@@ -83,6 +83,9 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
                     // Use SIMD-optimized gray code pair finding
                     let pairs = E::find_gray_code_pairs(group1, group2, &raw_encodings);
 
+                    println!("number of pairs found between weight {} and {}: {}", weight, weight + 1, pairs.len());
+                    
+                    
                     for (i, j) in pairs {
                         used[i] = true;
                         used[j] = true;
@@ -108,6 +111,9 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
                 next_level.push(combined_imp);
             }
+
+            println!("Level {}: next_level size = {}, prime_implicants so far = {}",
+                     level, next_level.len(), prime_implicants.len());
 
             for (i, implicant) in current_level.into_iter().enumerate() {
                 if !used[i] {

@@ -126,10 +126,14 @@ fn test_simd_threshold_detection() {
     // Small problem: should not use SIMD
     assert!(!simd_coverage::should_use_simd(100, 4));
 
-    // Large problem: might use SIMD (depends on CPU features)
-    let large_problem = simd_coverage::should_use_simd(10000, 4);
-    println!("SIMD available for large 4-bit problem: {}", large_problem);
+    // Large 4-bit problem: might use SIMD (depends on CPU features)
+    let large_problem_4bit = simd_coverage::should_use_simd(10000, 4);
+    println!("SIMD available for large 4-bit problem: {}", large_problem_4bit);
 
-    // 5-bit problem: not supported (only 4-bit for now)
-    assert!(!simd_coverage::should_use_simd(10000, 5));
+    // Large 5-bit problem: might use SIMD (depends on CPU features)
+    let large_problem_5bit = simd_coverage::should_use_simd(10000, 5);
+    println!("SIMD available for large 5-bit problem: {}", large_problem_5bit);
+
+    // 6-bit problem: not supported
+    assert!(!simd_coverage::should_use_simd(10000, 6));
 }

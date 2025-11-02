@@ -226,6 +226,7 @@ The CLI provides multiple output formats:
 - Striped memory layout for bit-plane operations (indices 0, 64, 128, ..., 448)
 
 ### Code Idioms and Best Practices
+- **Design Philosophy**: "Explicit is better than implicit" - prefer clear, explicit parameters over hidden defaults
 - Proper error handling: No `unwrap()` in user-facing code, use `?` operator
 - Pre-allocated vectors with `Vec::with_capacity()` where size is known
 - `PartialEq` and `Eq` derives for testability
