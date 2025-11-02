@@ -30,6 +30,7 @@ pub mod implicant;
 pub mod quine_mccluskey;
 pub mod petricks_method;
 pub mod simd_gray_code;
+pub mod simd_coverage;
 
 // High-level interface
 pub mod qm_solver;
@@ -51,6 +52,7 @@ pub use quine_mccluskey::QuineMcCluskey;
 pub use petricks_method::PetricksMethod;
 pub use qm_result::QMResult;
 pub use qm_solver::QMSolver;
+pub use simd_coverage::CoverageMatrix;
 
 // Re-export encoding types
 pub use encoding::{BitOps, Enc16, Enc32, Enc64, MintermEncoding};

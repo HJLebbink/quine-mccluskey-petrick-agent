@@ -30,8 +30,12 @@ This tool implements the Quine-McCluskey algorithm to minimize Boolean functions
   - Truth table generation
   - Interactive mode
 
-- **Performance Optimizations (NEW!)**:
+- **Performance Optimizations**:
   - AVX512 SIMD vectorization for Quine-McCluskey hot loop
+  - **NEW!** SIMD-accelerated coverage matrix (5.93× speedup)
+    - Bit-plane transposition for 512-way parallelism
+    - Automatic activation for large problems (≥1K checks)
+    - Requires AVX-512F and GFNI CPU features
   - 4-16x speedup on compatible CPUs for large problems
   - Runtime CPU feature detection with automatic scalar fallback
   - Handles up to 16 variables efficiently (~10s vs ~120s previously)
@@ -464,6 +468,29 @@ match n_variables {
 - Simple: One parameter instead of two
 
 See [`benches/README.md`](benches/README.md) for detailed documentation and [`benches/RESULTS.md`](benches/RESULTS.md) for complete benchmark results.
+
+### SIMD Coverage Matrix Benchmark
+
+The Quine-McCluskey algorithm includes AVX-512 accelerated coverage matrix computation for checking which minterms are covered by each prime implicant:
+
+```bash
+# Run SIMD coverage benchmark (requires AVX-512F and GFNI)
+cargo run --release --example benchmark_simd_coverage
+```
+
+**Results** (100 prime implicants × 10,000 minterms = 1 million checks):
+
+| Implementation | Time | Throughput | Speedup |
+|----------------|------|------------|---------|
+| Scalar | 7.69 ms | 130M checks/sec | 1.0× |
+| AVX-512 SIMD | 1.30 ms | 770M checks/sec | **5.93×** |
+
+The SIMD implementation processes 512 minterm-implicant pairs simultaneously using bit-plane transposition, achieving nearly 6× speedup despite transposition overhead.
+
+**Documentation:**
+- Implementation details: [`SIMD_COVERAGE.md`](SIMD_COVERAGE.md)
+- Benchmark code: [`examples/benchmark_simd_coverage.rs`](examples/benchmark_simd_coverage.rs)
+- Bug fix history: See `SIMD_COVERAGE_FIX.md` in the bitwise-rust-agent repository
 
 ## Contributing
 

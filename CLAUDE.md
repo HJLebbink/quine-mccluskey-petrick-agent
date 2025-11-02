@@ -6,11 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Rust-based Boolean logic optimization library and CLI tool featuring:
 - **Quine-McCluskey algorithm** for Boolean function minimization
+  - AVX-512 SIMD-accelerated coverage matrix computation (5.93× speedup)
 - **CNF to DNF conversion** with SIMD-optimized implementations (AVX2, AVX512)
 - **Petrick's method** for minimal cover selection
 - Multiple input/output formats for easy integration
 
-The project consists of both a library (`qm_agent`) and a binary (`qm-agent`) that provides comprehensive Boolean algebra operations.
+The project consists of both a library (`qm_agent`) and a binary (`qm-agent`) that provides comprehensive Boolean algebra operations with performance-critical paths optimized using AVX-512 when available.
 
 ## Essential Commands
 
@@ -53,7 +54,7 @@ cargo run --example cnf_2_dnf_5
 ### Running Benchmarks
 
 ```bash
-# Run all benchmarks
+# Run CNF to DNF benchmarks (Criterion-based)
 cargo bench --bench cnf_to_dnf_bench
 
 # Run specific benchmark groups
@@ -62,6 +63,9 @@ cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
 
 # Save baseline for comparison
 cargo bench --bench cnf_to_dnf_bench -- --save-baseline main
+
+# Run SIMD coverage matrix benchmark (example-based)
+cargo run --release --example benchmark_simd_coverage
 
 # See benches/README.md for detailed documentation
 ```
@@ -196,6 +200,8 @@ The CLI provides multiple output formats:
 - Runtime validation ensures n_bits doesn't exceed encoding capacity
 
 ### SIMD Optimizations
+
+**CNF to DNF Conversion:**
 - Runtime CPU feature detection with `is_x86_feature_detected!()`
 - Automatic fallback to scalar implementation if SIMD unavailable
 - **Performance characteristics**:
@@ -203,8 +209,21 @@ The CLI provides multiple output formats:
   - Medium problems (16-32 vars): Break-even point, dramatic gains at 32 vars
   - Large problems (64 vars): 4.0x speedup with AVX512, 2.8x with AVX2
 - AVX512 variants process 64, 32, 16, or 8 elements per vector depending on bit width
+
+**QMC Coverage Matrix (NEW!):**
+- AVX-512 accelerated coverage checking for Quine-McCluskey algorithm
+- Uses bit-plane transposition via GFNI instructions
+- Processes 512 minterm-implicant pairs simultaneously
+- **Performance**: 5.93× speedup (770M vs 130M checks/sec)
+- Requires AVX-512F and GFNI CPU features
+- Threshold-based: Only activates for problems with ≥1024 checks
+- Implementation: `src/qm/simd_coverage.rs`
+- Benchmark: `examples/benchmark_simd_coverage.rs`
+
+**General:**
 - All unsafe SIMD code properly wrapped with safe public APIs
 - Rust 2024 edition requires inner `unsafe` blocks within `unsafe fn`
+- Striped memory layout for bit-plane operations (indices 0, 64, 128, ..., 448)
 
 ### Code Idioms and Best Practices
 - Proper error handling: No `unwrap()` in user-facing code, use `?` operator

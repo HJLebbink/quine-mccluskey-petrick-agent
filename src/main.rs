@@ -267,8 +267,8 @@ fn integrate_your_qm_solver(
     let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
     let dont_cares_u64: Vec<u64> = dont_cares.iter().map(|&x| x as u64).collect();
 
-    solver.set_minterms(&minterms_u64);
-    solver.set_dont_cares(&dont_cares_u64);
+    solver.set_minterms(minterms_u64);
+    solver.set_dont_cares(dont_cares_u64);
 
     let result = solver.solve();
 

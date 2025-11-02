@@ -154,6 +154,28 @@ All examples use the `convert_cnf_to_dnf` or `convert_cnf_to_dnf_minimal` functi
 - Reproducible with fixed seed
 - **Runtime**: 1-2 seconds
 
+## Performance Benchmarks
+
+### benchmark_simd_coverage (`benchmark_simd_coverage.rs`)
+**SIMD Coverage Matrix Benchmark**
+- Compares scalar vs AVX-512 SIMD implementation
+- 100 prime implicants × 10,000 minterms = 1 million coverage checks
+- Includes correctness verification
+- Shows detailed performance metrics
+- **Requirements**: AVX-512F and GFNI CPU features
+- **Runtime**: ~10 seconds (includes warmup)
+
+**Results**:
+- Scalar: 7.69 ms (130M checks/sec)
+- SIMD: 1.30 ms (770M checks/sec)
+- **Speedup: 5.93×**
+
+```bash
+cargo run --release --example benchmark_simd_coverage
+```
+
+The SIMD implementation uses bit-plane transposition to process 512 minterm-implicant pairs simultaneously with AVX-512 instructions. See `SIMD_COVERAGE_FIX.md` in the bitwise-rust-agent repo for implementation details.
+
 ## Original C++ Source
 
 These examples are direct ports from test functions:

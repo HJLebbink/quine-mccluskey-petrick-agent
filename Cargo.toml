@@ -20,6 +20,11 @@ serde_json = "1.0"
 regex = "1.11"
 anyhow = "1.0"
 rand = "0.9.2"
+bitwise-simd = { path = "C:/Source/Private/rust/bitwise-rust-agent/bitwise-simd", optional = true }
+
+[features]
+default = ["simd"]
+simd = ["dep:bitwise-simd"]
 
 [dev-dependencies]
 tempfile = "3.23"
