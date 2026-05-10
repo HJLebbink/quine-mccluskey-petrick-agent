@@ -161,13 +161,13 @@ The CLI provides multiple output formats:
 
 ## Testing Structure
 
-- **Unit tests**: Located in `src/lib.rs` and module files, test core library functionality (14 tests)
-- **Integration tests**: Located in `tests/integration_tests.rs`, test CLI behavior end-to-end (10 tests)
+- **Unit tests**: Located in `src/lib.rs` and module files, test core library functionality (~66 tests)
+- **Integration tests**: Located in `tests/integration_tests.rs`, test CLI behavior end-to-end (~27 tests total)
 - **Equality tests**: Located in `tests/equality_tests.rs`, randomized quality assurance tests
   - `quick_equality_smoke_test`: Tests that different encodings produce identical results
   - `equality_test`: 100,000 iterations testing all encodings (run with `--ignored`)
   - `equality_test_minimal`: 100,000 iterations testing early pruning correctness (run with `--ignored`)
-- **Examples**: 15 total (7 CNF to DNF + 8 QM) with comprehensive README documentation
+- **Examples**: 28+ total across multiple categories (7 CNF→DNF, 9 QM basic, plus benchmarks and standalone demos) with comprehensive README documentation
 - **Benchmarks**: Criterion-based benchmarks in `benches/cnf_to_dnf_bench.rs`
   - 6 benchmark groups comparing Encoding16, Encoding32, and Encoding64 performance
   - Tests different problem sizes and conjunction densities

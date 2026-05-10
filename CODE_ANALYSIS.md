@@ -1,17 +1,30 @@
-# Code Analysis: Correctness and Efficiency
+# Legacy Code Analysis (October 2025)
 
-**Date**: 2025-10-06
-**Analysis of**: Quine-McCluskey implementation in `src/qm/`
-**Last Updated**: 2025-10-06 (AVX512 optimization completed)
+> **WARNING: This document is a legacy code audit from October 2025. Many issues documented here have been tracked separately or addressed. References to `src/qm/simd_gray_code.rs` in this document are outdated — the actual SIMD optimization lives in `src/qm/simd_coverage.rs` and gray code logic in `src/qm/gray_code.rs`. See `REPO_DEPENDENCIES.md` and `SIMD_COVERAGE.md` for current architecture.**
 
-## Executive Summary
+## Legacy Executive Summary (as of 2025-10-06)
 
 ✅ **Correctness**: Core algorithm is correct and fully tested
-✅ **Performance**: Significantly improved with AVX512 SIMD vectorization
-📈 **Optimization**: Hot loop now 4-16x faster on compatible CPUs
-⚠️ **Remaining**: Some minor optimization opportunities remain
+✅ **Performance**: Significantly improved with AVX-512 SIMD vectorization
+📈 **Optimization**: Hot loop improved with coverage matrix (5.93× speedup)
+⚠️ **Remaining**: Some minor optimization opportunities documented below
 
-## Recent Optimizations (October 2025)
+## Key Issues from Original Analysis (Current Status)
+
+| # | Issue | Status |
+|---|-------|--------|
+| 1 | `from_minterm` allocation | ✅ Fixed — uses `Vec::with_capacity` + reverse iteration |
+| 2 | Repeated mask calculation | ✅ Fixed — mask now field on `QuineMcCluskey` struct |
+| 3 | Covered minterms tracking | ✅ Known acceptable — sort+dedup faster than HashSet |
+| 4 | `println!` in library code | ⚠️ Addressed indirectly — step logging via `solution_steps` Vec |
+| 5 | `from_raw_encoding` invalid covered_minterms | 📝 Known — immediately overwritten at call site |
+| 6 | `find_essential_prime_implicants` placeholder | ✅ Fixed — replaced by `simd_coverage.rs` + Petrick's method |
+
+## Current Module Structure (replaced references in this doc)
+
+- Original analysis referenced `src/qm/simd_gray_code.rs` — now replaced by:
+  - `src/qm/gray_code.rs` — Gray code pair finding (fxhash-based)
+  - `src/qm/simd_coverage.rs` — SIMD-accelerated coverage matrix
 
 ### ✅ AVX512 SIMD Vectorization
 

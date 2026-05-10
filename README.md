@@ -82,11 +82,11 @@ anyhow = "1.0"
 
 ### Option 1: Download Release (Recommended)
 
-Download the latest release from [GitHub Releases](https://github.com/your-username/qmc-rust-agent/releases):
+Download the latest release from [GitHub Releases](https://github.com/HJLebbink/quine-mccluskey-petrick-agent/releases):
 
 ```bash
 # Download and extract installer package
-wget https://github.com/your-username/qmc-rust-agent/releases/latest/download/qmc-rust-agent-installer.tar.gz
+wget https://github.com/HJLebbink/quine-mccluskey-petrick-agent/releases/latest/download/qmc-rust-agent-installer.tar.gz
 tar -xzf qmc-rust-agent-installer.tar.gz
 cd qmc-rust-agent-*-installer
 
@@ -97,9 +97,10 @@ cd qmc-rust-agent-*-installer
 ### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/your-username/qmc-rust-agent.git
+git clone https://github.com/HJLebbink/quine-mccluskey-petrick-agent.git
 cd qmc-rust-agent
 cargo build --release
+```
 
 # Or run directly
 cargo run -- minimize -i "f(A,B) = Σ(1,3)"
@@ -341,21 +342,26 @@ Claude: "I found 2 issues:
 ### Core Components
 
 **Library Structure** (`src/lib.rs`):
+- 4 modules: `qm` (Quine-McCluskey), `cnf_dnf` (CNF→DNF conversion), `simplify` (if-then-else), `agent_api` (JSON API)
 - `QMSolver`: Main solver interface that orchestrates the QM algorithm
 - `QMResult`: Result structure containing minimized expressions, prime implicants, and solution steps
-- Convenience functions for common operations (parsing, variable name generation)
+- `minimize_function()`: Convenience auto-encoding selector
 
-**QM Solver Module** (`src/qm_solver/`):
-- `quine_mccluskey.rs`: Core QM algorithm implementation with `Implicant` and `BitState` types
-- `petricks_method.rs`: Implementation of Petrick's method for finding minimal covers
-- `utils.rs`: Utility functions for the QM algorithm
-- `mod.rs`: Module interface and `QMSolver` orchestration
+**QM Module** (`src/qm/`):
+- `implicant.rs`: `Implicant` struct and `BitState` enum (Zero, One, DontCare)
+- `quine_mccluskey.rs`: Core QM algorithm with Petrick's method integration
+- `petricks_method.rs`: Minimal cover selection
+- `qm_solver.rs`: `QMSolver` orchestration and public API
+- `qm_result.rs`: `QMResult` output structure
+- `encoding.rs`: `MintermEncoding` trait with Enc16/32/64 variants
+- `simd_coverage.rs`: AVX-512 coverage matrix (5.93× speedup)
+- `gray_code.rs`, `minterm_set.rs`, `random.rs`: Supporting utilities
+- `classic.rs`: C++ API-compatible port
 
 **CLI Binary** (`src/main.rs`):
-- Complete CLI with subcommands: `minimize`, `interactive`, `examples`
-- Multiple input parsers: JSON, function notation, simple text, truth tables
-- Multiple output formats: human-readable, JSON, table, step-by-step
-- Interactive mode for iterative problem solving
+- 4 subcommands: `minimize`, `simplify`, `interactive`, `examples`
+- Multiple input parsers: JSON, function notation (f(A,B) = Σ(1,3)), simple text, truth tables, file paths
+- Multiple output formats: human-readable (default), JSON, table, step-by-step
 
 ## Testing
 
@@ -385,8 +391,8 @@ The project includes comprehensive benchmarks comparing different SIMD optimizat
 cargo bench --bench cnf_to_dnf_bench
 
 # Run specific benchmark groups
-cargo bench --bench cnf_to_dnf_bench -- optimization_levels
-cargo bench --bench cnf_to_dnf_bench -- problem_sizes
+cargo bench --bench cnf_to_dnf_bench -- encoding_variants
+cargo bench --bench cnf_to_dnf_bench -- minimal_dnf
 cargo bench --bench cnf_to_dnf_bench -- 64bit_comparison
 ```
 
@@ -490,7 +496,7 @@ The SIMD implementation processes 512 minterm-implicant pairs simultaneously usi
 **Documentation:**
 - Implementation details: [`SIMD_COVERAGE.md`](SIMD_COVERAGE.md)
 - Benchmark code: [`examples/benchmark_simd_coverage.rs`](examples/benchmark_simd_coverage.rs)
-- Bug fix history: See `SIMD_COVERAGE_FIX.md` in the bitwise-rust-agent repository
+- Integration history: [`QMC_COVERS_INTEGRATION.md`](../bitwise-rust-agent/QMC_COVERS_INTEGRATION.md) in the bitwise-rust-agent workspace
 
 ## Contributing
 
@@ -502,9 +508,10 @@ The SIMD implementation processes 512 minterm-implicant pairs simultaneously usi
 
 ## License
 
-[Add your license here]
+MIT License — see [LICENSE](LICENSE) file.
 
 ## Acknowledgments
 
 - Built for integration with Claude Code
 - Implements the classic Quine-McCluskey algorithm for Boolean minimization
+- SIMD primitives from [bitwise-rust-agent](../bitwise-rust-agent/bitwise-simd)

@@ -167,19 +167,21 @@ Default Criterion settings:
 To add your own benchmark:
 
 ```rust
-use qm_agent::cnf_dnf::convert_cnf_to_dnf_encoding;
-use qm_agent::qm::Encoding16;
+use qm_agent::cnf_dnf::cnf_to_dnf;
+use qm_agent::qm::Enc16;
+use std::hint::black_box;
 
 fn bench_my_test(c: &mut Criterion) {
     let mut group = c.benchmark_group("my_test");
 
-    let cnf = vec![0b0011, 0b1100]; // Your CNF
+    let cnf = vec![0b0011u64, 0b1100u64]; // Your CNF
 
     group.bench_function("test_name", |b| {
         b.iter(|| {
-            convert_cnf_to_dnf_encoding::<Encoding16>(
+            cnf_to_dnf::<Enc16>(
                 black_box(&cnf),
-                black_box(4)
+                black_box(4),
+                black_box(qm_agent::cnf_dnf::OptimizedFor::AutoDetect)
             )
         });
     });

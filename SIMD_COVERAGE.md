@@ -340,7 +340,7 @@ Supported CPUs:
 ## References
 
 - **Bit-plane transposition**: See `bitwise-simd` crate documentation
-- **Coverage bug fix**: `SIMD_COVERAGE_FIX.md` in bitwise-rust-agent repo
+- **Integration history**: `QMC_COVERS_INTEGRATION.md` and `QMC_COVERS_INTEGRATION_STATUS.md` in bitwise-rust-agent repo
 - **Generated functions**: `bitwise-simd/generated/rust/`
 - **Benchmark code**: `examples/benchmark_simd_coverage.rs`
 

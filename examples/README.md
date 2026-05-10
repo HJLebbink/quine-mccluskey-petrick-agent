@@ -1,21 +1,20 @@
-# CNF to DNF Examples
+# Examples Library
 
-These examples demonstrate the CNF (Conjunctive Normal Form) to DNF (Disjunctive Normal Form) conversion algorithms from the C++ implementation.
+## CNF to DNF Conversion
 
-## Running Examples
+These examples demonstrate CNF (Conjunctive Normal Form) to DNF (Disjunctive Normal Form) conversion algorithms ported from the C++ reference implementation.
+
+### Running Examples
 
 ```bash
 # Run a specific example
-cargo run --example test0
-
-# Run all examples (note: test_very_hard may take a while)
-cargo run --example test0
-cargo run --example test1
-cargo run --example test2
-cargo run --example test3
-cargo run --example test4
-cargo run --example test5
-cargo run --example test_very_hard
+cargo run --example cnf_2_dnf_0
+cargo run --example cnf_2_dnf_1
+cargo run --example cnf_2_dnf_2
+cargo run --example cnf_2_dnf_3
+cargo run --example cnf_2_dnf_4
+cargo run --example cnf_2_dnf_5
+cargo run --example cnf_2_dnf_very_hard   # caution: may take a while
 ```
 
 ## Examples Description
@@ -174,7 +173,7 @@ All examples use the `convert_cnf_to_dnf` or `convert_cnf_to_dnf_minimal` functi
 cargo run --release --example benchmark_simd_coverage
 ```
 
-The SIMD implementation uses bit-plane transposition to process 512 minterm-implicant pairs simultaneously with AVX-512 instructions. See `SIMD_COVERAGE_FIX.md` in the bitwise-rust-agent repo for implementation details.
+The SIMD implementation uses bit-plane transposition to process 512 minterm-implicant pairs simultaneously with AVX-512 instructions. See `QMC_COVERS_INTEGRATION.md` in the bitwise-rust-agent workspace for implementation details.
 
 ## Original C++ Source
 
