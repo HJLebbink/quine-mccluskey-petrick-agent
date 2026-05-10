@@ -47,7 +47,18 @@ impl<E: MintermEncoding> Implicant<E> {
 
     #[inline]
     pub fn covers_minterm(&self, minterm: E::Value) -> bool {
-        self.covered_minterms.contains(&minterm)
+        // Check against pre-computed list first for speed
+        if self.covered_minterms.contains(&minterm) {
+            return true;
+        }
+        // Fall back to bit-level matching (needed for DontCare expansion from min-cubes)
+        for (i, &state) in self.bits.iter().enumerate() {
+            if state == BitState::DontCare { continue; }
+            let expected = if state == BitState::One { 1u64 } else { 0u64 };
+            let actual = (minterm.to_u64() >> i) & 1;
+            if actual != expected { return false; }
+        }
+        true
     }
 
     /// Fast gray code check using raw encoding (like C++ is_gray_code)

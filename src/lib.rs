@@ -15,7 +15,7 @@ pub mod agent_api; // JSON API for Claude integration
 pub use qm::{QMSolver, QMResult};
 pub use qm::{QuineMcCluskey, Implicant, BitState};
 pub use qm::PetricksMethod;
-pub use qm::{Enc16, Enc32, Enc64};
+pub use qm::{Enc16, Enc32, Enc64, MintermEncoding};
 
 /// Convenience function to minimize a Boolean function (up to 64 variables)
 ///

@@ -46,6 +46,12 @@ pub mod random;
 // C++ compatibility and utilities
 pub mod classic;
 
+// Min-cubes: aggressive PI generation via bitwise tricks (internal)
+mod min_cubes;
+pub use min_cubes::comb;
+pub use min_cubes::primes;
+pub use min_cubes::setcover::{covers, SetCoverSolution, SetCoverSolver, solve_set_cover, get_solver};
+
 // Re-export main types for convenience
 pub use implicant::{BitState, Implicant};
 pub use quine_mccluskey::QuineMcCluskey;

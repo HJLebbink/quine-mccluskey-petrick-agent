@@ -22,16 +22,19 @@ anyhow = "1.0"
 rand = "0.9.2"
 bitwise-simd = { path = "C:/Source/Private/rust/bitwise-rust-agent/bitwise-simd", optional = true }
 rustc-hash = "2.1.1"
+good_lp = { version = "1.14", optional = true, features = ["default"] }
 
 [features]
-default = ["simd"]
+default = ["simd", "mips"]
 simd = ["dep:bitwise-simd"]
+mips = ["dep:good_lp"]
 
 [dev-dependencies]
 tempfile = "3.23"
 assert_cmd = "2.0"
 predicates = "3.1"
 criterion = "0.7"
+proptest = "1.8"
 
 [[bench]]
 name = "cnf_to_dnf_bench"
@@ -43,5 +46,14 @@ harness = false
 
 [[bench]]
 name = "gray_code_bench"
+harness = false
+
+[[bench]]
+name = "setcover_bench"
+harness = false
+required-features = ["mips"]
+
+[[bench]]
+name = "min_cubes_bench"
 harness = false
 
