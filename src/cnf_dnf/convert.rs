@@ -1,10 +1,9 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
-use crate::qm::encoding::MintermEncoding;
-use super::optimized_for::OptimizedFor;
 use super::error::CnfDnfError;
+use super::optimized_for::OptimizedFor;
 use super::utils::test_bit;
-
+use crate::qm::encoding::MintermEncoding;
 
 /// Convert CNF to DNF with encoding-aware optimization selection
 ///
@@ -38,7 +37,7 @@ use super::utils::test_bit;
 pub fn cnf_to_dnf<E: MintermEncoding>(
     cnf: &[u64],
     n_bits: usize,
-    of: OptimizedFor
+    of: OptimizedFor,
 ) -> Result<Vec<u64>, CnfDnfError> {
     validate_parameters::<E>(n_bits, of)?;
     let result_dnf = cnf_to_dnf_impl(cnf, n_bits, of.resolve(n_bits));
@@ -66,7 +65,6 @@ pub fn cnf_to_dnf_minimal<E: MintermEncoding>(
     Ok(result)
 }
 
-
 /// reference implementation for convert_cnf_to_dnf_minimal
 pub fn cnf_to_dnf_minimal_reference<E: MintermEncoding>(
     cnf: &[u64],
@@ -79,7 +77,11 @@ pub fn cnf_to_dnf_minimal_reference<E: MintermEncoding>(
     let size_before = result_dnf.len();
     let result = filter_to_minimal(result_dnf);
     if false {
-        println!("cnf_to_dnf_minimal_reference {} to {}", size_before, result.len());
+        println!(
+            "cnf_to_dnf_minimal_reference {} to {}",
+            size_before,
+            result.len()
+        );
     }
     Ok(result)
 }
@@ -129,11 +131,7 @@ fn filter_to_minimal(dnf: Vec<u64>) -> Vec<u64> {
 }
 
 /// Private implementation of CNF to DNF conversion
-fn cnf_to_dnf_impl(
-    cnf: &[u64],
-    n_bits: usize,
-    of: OptimizedFor,
-) -> Vec<u64> {
+fn cnf_to_dnf_impl(cnf: &[u64], n_bits: usize, of: OptimizedFor) -> Vec<u64> {
     let mut result_dnf: Vec<u64> = Vec::new();
     let mut first = true;
 
@@ -193,44 +191,29 @@ fn cnf_to_dnf_impl(
 }
 
 /// Run the appropriate optimization based on the OptimizedFor setting
-fn run_optimized(
-    of: OptimizedFor,
-    result_dnf_next: &[u64],
-    z: u64,
-) -> (Vec<usize>, bool) {
+fn run_optimized(of: OptimizedFor, result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     match of {
         OptimizedFor::AutoDetect => {
-            unreachable!("AutoDetect should be resolved to a concrete optimization level before reaching this point")
+            unreachable!(
+                "AutoDetect should be resolved to a concrete optimization level before reaching this point"
+            )
         }
         OptimizedFor::X64 => optimized_for_x64(result_dnf_next, z),
         #[cfg(target_arch = "x86_64")]
-        OptimizedFor::Avx512_64bits => {
-            super::simd::run_avx512_64bits(result_dnf_next, z)
-        }
+        OptimizedFor::Avx512_64bits => super::simd::run_avx512_64bits(result_dnf_next, z),
         #[cfg(target_arch = "x86_64")]
-        OptimizedFor::Avx512_32bits => {
-            super::simd::run_avx512_32bits(result_dnf_next, z)
-        }
+        OptimizedFor::Avx512_32bits => super::simd::run_avx512_32bits(result_dnf_next, z),
         #[cfg(target_arch = "x86_64")]
-        OptimizedFor::Avx512_16bits => {
-            super::simd::run_avx512_16bits(result_dnf_next, z)
-        }
+        OptimizedFor::Avx512_16bits => super::simd::run_avx512_16bits(result_dnf_next, z),
         #[cfg(target_arch = "x86_64")]
-        OptimizedFor::Avx512_8bits => {
-            super::simd::run_avx512_8bits(result_dnf_next, z)
-        }
+        OptimizedFor::Avx512_8bits => super::simd::run_avx512_8bits(result_dnf_next, z),
         #[cfg(target_arch = "x86_64")]
-        OptimizedFor::Avx2_64bits => {
-            super::simd::run_avx2_64bits(result_dnf_next, z)
-        }
+        OptimizedFor::Avx2_64bits => super::simd::run_avx2_64bits(result_dnf_next, z),
     }
 }
 
 /// Check if we should add z, and return indices to delete (scalar version)
-pub(crate) fn optimized_for_x64(
-    result_dnf_next: &[u64],
-    z: u64,
-) -> (Vec<usize>, bool) {
+pub(crate) fn optimized_for_x64(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
     let mut index_to_delete = Vec::new();
 
     for (index, &q) in result_dnf_next.iter().enumerate() {
@@ -250,14 +233,9 @@ pub(crate) fn optimized_for_x64(
     (index_to_delete, true)
 }
 
-
 /// Convert CNF to DNF with early pruning optimization, the results contain at least the smallest DNF
 /// with the smallest number of literals. This is not guaranteed to be only the minimal DNF
-fn cnf_to_dnf_minimal_method1(
-    cnf: &[u64],
-    n_bits: usize,
-    of: OptimizedFor,
-) -> Vec<u64> {
+fn cnf_to_dnf_minimal_method1(cnf: &[u64], n_bits: usize, of: OptimizedFor) -> Vec<u64> {
     let n_disjunctions = cnf.len();
     let mut n_disjunction_done = 0;
     let mut result_dnf: Vec<u64> = Vec::new();
@@ -285,7 +263,8 @@ fn cnf_to_dnf_minimal_method1(
                         let conjunction_size = z.count_ones() as i32;
                         if conjunction_size < smallest_cnf_size {
                             smallest_cnf_size = conjunction_size;
-                            max_size = conjunction_size + (n_disjunctions - n_disjunction_done) as i32;
+                            max_size =
+                                conjunction_size + (n_disjunctions - n_disjunction_done) as i32;
                         }
 
                         let consider_z = max_size >= conjunction_size;
@@ -308,7 +287,8 @@ fn cnf_to_dnf_minimal_method1(
                                     for read_idx in 0..len {
                                         if !to_delete[read_idx] {
                                             if write_idx != read_idx {
-                                                result_dnf_next[write_idx] = result_dnf_next[read_idx];
+                                                result_dnf_next[write_idx] =
+                                                    result_dnf_next[read_idx];
                                             }
                                             write_idx += 1;
                                         }
@@ -331,9 +311,7 @@ fn cnf_to_dnf_minimal_method1(
 }
 
 /// Convert CNF with string variable names to DNF
-pub fn cnf_to_dnf_with_names(
-    cnf: &[Vec<String>],
-) -> Result<Vec<Vec<String>>, CnfDnfError> {
+pub fn cnf_to_dnf_with_names(cnf: &[Vec<String>]) -> Result<Vec<Vec<String>>, CnfDnfError> {
     // Create translations
     let mut translation1: HashMap<String, usize> = HashMap::new();
     let mut translation2: HashMap<usize, String> = HashMap::new();
@@ -389,18 +367,15 @@ pub fn cnf_to_dnf_with_names(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::utils::cnf_to_string;
+    use super::*;
     use std::collections::HashSet;
 
     #[test]
     fn test_cnf_to_dnf_simple() {
         // CNF = (1|2) & (3|4)
         // DNF = (1&3) | (2&3) | (1&4) | (2&4)
-        let cnf: Vec<u64> = vec![
-            (1 << 1) | (1 << 2),
-            (1 << 3) | (1 << 4),
-        ];
+        let cnf: Vec<u64> = vec![(1 << 1) | (1 << 2), (1 << 3) | (1 << 4)];
 
         let dnf = cnf_to_dnf::<crate::qm::Enc16>(&cnf, 8, OptimizedFor::AutoDetect)
             .expect("CNF to DNF conversion failed");
@@ -413,7 +388,9 @@ mod tests {
             (1 << 2) | (1 << 3), // 2&3
             (1 << 1) | (1 << 4), // 1&4
             (1 << 2) | (1 << 4), // 2&4
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         let actual: HashSet<u64> = dnf.into_iter().collect();
         assert_eq!(expected, actual);
@@ -426,18 +403,14 @@ mod tests {
             vec!["C".to_string(), "D".to_string()],
         ];
 
-        let dnf = cnf_to_dnf_with_names(&cnf)
-            .expect("CNF to DNF conversion with names failed");
+        let dnf = cnf_to_dnf_with_names(&cnf).expect("CNF to DNF conversion with names failed");
 
         assert_eq!(dnf.len(), 4);
     }
 
     #[test]
     fn test_minimal_dnf() {
-        let cnf: Vec<u64> = vec![
-            (1 << 1) | (1 << 2),
-            (1 << 3) | (1 << 4),
-        ];
+        let cnf: Vec<u64> = vec![(1 << 1) | (1 << 2), (1 << 3) | (1 << 4)];
 
         let dnf = cnf_to_dnf_minimal::<crate::qm::Enc16>(&cnf, 8, OptimizedFor::AutoDetect)
             .expect("Minimal DNF conversion failed");
@@ -451,10 +424,7 @@ mod tests {
 
     #[test]
     fn test_string_conversion() {
-        let cnf: Vec<u64> = vec![
-            (1 << 1) | (1 << 2),
-            (1 << 3) | (1 << 4),
-        ];
+        let cnf: Vec<u64> = vec![(1 << 1) | (1 << 2), (1 << 3) | (1 << 4)];
 
         let cnf_str = cnf_to_string(&cnf);
         assert!(cnf_str.contains("&"));
@@ -481,18 +451,12 @@ mod tests {
             .expect("AutoDetect conversion failed");
 
         // Test explicit X64
-        let dnf_x64 = cnf_to_dnf::<crate::qm::Enc64>(
-            &cnf,
-            3,
-            OptimizedFor::X64
-        ).expect("X64 conversion failed");
+        let dnf_x64 = cnf_to_dnf::<crate::qm::Enc64>(&cnf, 3, OptimizedFor::X64)
+            .expect("X64 conversion failed");
 
         // Test explicit AVX512
-        let dnf_avx512 = cnf_to_dnf::<crate::qm::Enc64>(
-            &cnf,
-            3,
-            OptimizedFor::Avx512_64bits
-        ).expect("AVX512 conversion failed");
+        let dnf_avx512 = cnf_to_dnf::<crate::qm::Enc64>(&cnf, 3, OptimizedFor::Avx512_64bits)
+            .expect("AVX512 conversion failed");
 
         // All should produce identical results
         assert_eq!(dnf_auto, dnf_x64);
@@ -505,19 +469,16 @@ mod tests {
         let cnf: Vec<u64> = vec![0b1010, 0b1100, 0b0110];
 
         // Test auto-detection
-        let dnf_auto = cnf_to_dnf_minimal::<crate::qm::Enc64>(
-            &cnf, 4, OptimizedFor::AutoDetect
-        ).expect("AutoDetect minimal conversion failed");
+        let dnf_auto = cnf_to_dnf_minimal::<crate::qm::Enc64>(&cnf, 4, OptimizedFor::AutoDetect)
+            .expect("AutoDetect minimal conversion failed");
 
         // Test explicit X64
-        let dnf_x64 = cnf_to_dnf_minimal::<crate::qm::Enc64>(
-            &cnf, 4, OptimizedFor::AutoDetect
-        ).expect("X64 minimal conversion failed");
+        let dnf_x64 = cnf_to_dnf_minimal::<crate::qm::Enc64>(&cnf, 4, OptimizedFor::AutoDetect)
+            .expect("X64 minimal conversion failed");
 
         // Test explicit AVX2
-        let dnf_avx2 = cnf_to_dnf_minimal::<crate::qm::Enc64>(
-            &cnf, 4, OptimizedFor::AutoDetect
-        ).expect("AVX2 minimal conversion failed");
+        let dnf_avx2 = cnf_to_dnf_minimal::<crate::qm::Enc64>(&cnf, 4, OptimizedFor::AutoDetect)
+            .expect("AVX2 minimal conversion failed");
 
         // All should produce identical results
         assert_eq!(dnf_auto, dnf_x64);
@@ -529,5 +490,4 @@ mod tests {
             assert_eq!(term.count_ones(), first_size);
         }
     }
-
 }

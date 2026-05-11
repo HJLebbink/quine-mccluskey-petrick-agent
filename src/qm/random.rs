@@ -3,10 +3,10 @@
 //! This module provides utilities for generating random minterms for testing
 //! and benchmarking the Quine-McCluskey algorithm.
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::distr::uniform::SampleUniform;
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::collections::HashSet;
 use std::hash::Hash;
-use rand::distr::uniform::SampleUniform;
 
 /// Trait for types that can be used as minterm values in random generation
 pub trait RandomMinterm: SampleUniform + Ord + Hash + Copy + Sized {

@@ -1,6 +1,6 @@
 // Example: Comparison Operators in if-then-else simplification
 
-use qm_agent::simplify::{format_result, simplify_branches, BoolExpr, BranchSet};
+use qm_agent::simplify::{BoolExpr, BranchSet, format_result, simplify_branches};
 
 fn main() {
     println!("=== Comparison Operators Demo ===\n");
@@ -91,10 +91,7 @@ fn example_3_mixed() {
     branches.declare_int("count", 0, 3);
 
     branches.add_branch(
-        BoolExpr::and(
-            BoolExpr::var("enabled"),
-            BoolExpr::greater_than("count", 0),
-        ),
+        BoolExpr::and(BoolExpr::var("enabled"), BoolExpr::greater_than("count", 0)),
         "active",
     );
     branches.add_branch(BoolExpr::var("enabled"), "ready");

@@ -46,10 +46,7 @@ pub fn minterm_to_formula<E: MintermEncoding>(
 }
 
 /// Convert one minterm to string representation
-pub fn minterm_to_string<E: MintermEncoding>(
-    number_vars: usize,
-    minterm: E::Value,
-) -> String {
+pub fn minterm_to_string<E: MintermEncoding>(number_vars: usize, minterm: E::Value) -> String {
     let mut result = vec![DONT_KNOW; number_vars];
 
     for i in 0..number_vars {
@@ -81,10 +78,7 @@ pub fn minterms_to_strings<E: MintermEncoding>(
 }
 
 /// Convert multiple minterms to single string
-pub fn minterms_to_string<E: MintermEncoding>(
-    number_vars: usize,
-    minterms: &[E::Value],
-) -> String {
+pub fn minterms_to_string<E: MintermEncoding>(number_vars: usize, minterms: &[E::Value]) -> String {
     minterms_to_strings::<E>(number_vars, minterms).join(" ")
 }
 
@@ -132,9 +126,18 @@ pub fn reduce_minterms_classic<E: MintermEncoding>(
                 let new_mt = replace_complements::<E>(term_i, term_j);
 
                 if show_info {
-                    println!("INFO: 09f28d3a: term_i: {}", minterm_to_string::<E>(n_variables, term_i));
-                    println!("INFO: 2d17146f: term_j: {}", minterm_to_string::<E>(n_variables, term_j));
-                    println!("INFO: 313a49ea: new_mt: {}", minterm_to_string::<E>(n_variables, new_mt));
+                    println!(
+                        "INFO: 09f28d3a: term_i: {}",
+                        minterm_to_string::<E>(n_variables, term_i)
+                    );
+                    println!(
+                        "INFO: 2d17146f: term_j: {}",
+                        minterm_to_string::<E>(n_variables, term_j)
+                    );
+                    println!(
+                        "INFO: 313a49ea: new_mt: {}",
+                        minterm_to_string::<E>(n_variables, new_mt)
+                    );
                 }
 
                 new_minterms.insert(new_mt);
@@ -149,8 +152,10 @@ pub fn reduce_minterms_classic<E: MintermEncoding>(
     for i in 0..max {
         if !checked[i] {
             if show_info {
-                println!("INFO: 6dc50c80: adding existing minterm: {}",
-                         minterm_to_string::<E>(n_variables, minterms[i]));
+                println!(
+                    "INFO: 6dc50c80: adding existing minterm: {}",
+                    minterm_to_string::<E>(n_variables, minterms[i])
+                );
             }
             new_minterms.insert(minterms[i]);
         }
@@ -160,7 +165,10 @@ pub fn reduce_minterms_classic<E: MintermEncoding>(
 }
 
 /// Reduce minterms using an optimized algorithm
-pub fn reduce_minterms<E: MintermEncoding>(minterms: &[E::Value], show_info: bool) -> Vec<E::Value> {
+pub fn reduce_minterms<E: MintermEncoding>(
+    minterms: &[E::Value],
+    show_info: bool,
+) -> Vec<E::Value> {
     let mut total_comparisons = 0u64;
     let mut set = MintermSet::<E>::new();
     set.add_all(minterms);
@@ -183,7 +191,9 @@ pub fn reduce_minterms<E: MintermEncoding>(minterms: &[E::Value], show_info: boo
         total_comparisons += (max_i * max_j) as u64;
 
         if show_info {
-            println!("INFO: 413d6ad8: max_i = {max_i}; max_j = {max_j}; total_comparisons = {total_comparisons}");
+            println!(
+                "INFO: 413d6ad8: max_i = {max_i}; max_j = {max_j}; total_comparisons = {total_comparisons}"
+            );
         }
 
         for i in 0..max_i {
@@ -198,9 +208,18 @@ pub fn reduce_minterms<E: MintermEncoding>(minterms: &[E::Value], show_info: boo
                     let new_mt = replace_complements::<E>(term_i, term_j);
 
                     if show_info {
-                        println!("INFO: 09f28d3a: term_i: {}", minterm_to_string::<E>(3, term_i));
-                        println!("INFO: 2d17146f: term_j: {}", minterm_to_string::<E>(3, term_j));
-                        println!("INFO: 313a49ea: new_mt: {}", minterm_to_string::<E>(3, new_mt));
+                        println!(
+                            "INFO: 09f28d3a: term_i: {}",
+                            minterm_to_string::<E>(3, term_i)
+                        );
+                        println!(
+                            "INFO: 2d17146f: term_j: {}",
+                            minterm_to_string::<E>(3, term_j)
+                        );
+                        println!(
+                            "INFO: 313a49ea: new_mt: {}",
+                            minterm_to_string::<E>(3, new_mt)
+                        );
                     }
 
                     new_minterms.insert(new_mt);
@@ -535,7 +554,9 @@ pub mod petrick {
     }
 
     /// Apply column dominance reduction
-    pub fn column_dominance<E: MintermEncoding>(pi_table2: &PITable2<E::Value>) -> PITable2<E::Value> {
+    pub fn column_dominance<E: MintermEncoding>(
+        pi_table2: &PITable2<E::Value>,
+    ) -> PITable2<E::Value> {
         let pi_table1 = convert::<E>(pi_table2);
         let all_pi: Vec<E::Value> = pi_table1.keys().copied().collect();
         let mut pi_to_be_deleted = HashSet::new();
@@ -582,7 +603,6 @@ pub mod petrick {
         pi_table2: &PITable2<E::Value>,
         show_info: bool,
     ) -> Vec<Vec<E::Value>> {
-
         // Create translation maps
         let mut translation1: HashMap<E::Value, usize> = HashMap::new();
         let mut translation2: HashMap<usize, E::Value> = HashMap::new();
@@ -624,12 +644,25 @@ pub mod petrick {
         // Convert CNF to DNF using encoding-aware API
         // Note: CNF is always u64-based, so we use Encoding64 for up to 64 variables
         let smallest_conjunctions = if n_variables <= 16 {
-            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc16>(&cnf, n_variables, OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc16>(
+                &cnf,
+                n_variables,
+                OptimizedFor::AutoDetect,
+            )
         } else if n_variables <= 32 {
-            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc32>(&cnf, n_variables, OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc32>(
+                &cnf,
+                n_variables,
+                OptimizedFor::AutoDetect,
+            )
         } else {
-            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc64>(&cnf, n_variables, OptimizedFor::AutoDetect)
-        }.expect("CNF to DNF conversion failed");
+            cnf_dnf::cnf_to_dnf_minimal::<crate::qm::Enc64>(
+                &cnf,
+                n_variables,
+                OptimizedFor::AutoDetect,
+            )
+        }
+        .expect("CNF to DNF conversion failed");
 
         if show_info {
             println!("DNF = {}", cnf_dnf::dnf_to_string(&smallest_conjunctions));
@@ -641,9 +674,10 @@ pub mod petrick {
             let mut x = Vec::new();
             for i in 0..64 {
                 if (conj >> i) & 1 == 1
-                    && let Some(&pi) = translation2.get(&i) {
-                        x.push(pi);
-                    }
+                    && let Some(&pi) = translation2.get(&i)
+                {
+                    x.push(pi);
+                }
             }
             result.push(x);
         }
@@ -669,46 +703,65 @@ pub mod petrick {
         }
 
         // 2. Identify primary essential prime implicants
-        let (pi_table2, primary_essential_pi) = identify_primary_essential_pi2::<E>(&convert::<E>(&pi_table1));
+        let (pi_table2, primary_essential_pi) =
+            identify_primary_essential_pi2::<E>(&convert::<E>(&pi_table1));
         if show_info {
-            println!("2] identified primary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
-                     primary_essential_pi.len(), pi_table2.len());
+            println!(
+                "2] identified primary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
+                primary_essential_pi.len(),
+                pi_table2.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table2, n_bits));
         }
 
         // 3. Row dominance
         let pi_table3 = row_dominance::<E>(&pi_table2);
         if show_info {
-            println!("3] reduced based on row dominance: number of PIs remaining = {}", pi_table3.len());
+            println!(
+                "3] reduced based on row dominance: number of PIs remaining = {}",
+                pi_table3.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table3, n_bits));
         }
 
         // 4. Column dominance
         let pi_table4 = column_dominance::<E>(&pi_table3);
         if show_info {
-            println!("4] reduced based on column dominance: number of PIs remaining = {}", pi_table4.len());
+            println!(
+                "4] reduced based on column dominance: number of PIs remaining = {}",
+                pi_table4.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table4, n_bits));
         }
 
         // 5. Identify secondary essential prime implicants
         let (pi_table5, secondary_essential_pi) = identify_primary_essential_pi2::<E>(&pi_table4);
         if show_info {
-            println!("5] identified secondary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
-                     secondary_essential_pi.len(), pi_table5.len());
+            println!(
+                "5] identified secondary essential PIs: number of essential PIs = {}; number of remaining PIs = {}",
+                secondary_essential_pi.len(),
+                pi_table5.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table5, n_bits));
         }
 
         // 6. Row dominance
         let pi_table6 = row_dominance::<E>(&pi_table5);
         if show_info {
-            println!("6] reduced based on row dominance: number of PIs remaining = {}", pi_table6.len());
+            println!(
+                "6] reduced based on row dominance: number of PIs remaining = {}",
+                pi_table6.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table6, n_bits));
         }
 
         // 7. Column dominance
         let pi_table7 = column_dominance::<E>(&pi_table6);
         if show_info {
-            println!("7] reduced based on column dominance: number of PIs remaining = {}", pi_table7.len());
+            println!(
+                "7] reduced based on column dominance: number of PIs remaining = {}",
+                pi_table7.len()
+            );
             println!("{}", to_string_pi_table2::<E>(&pi_table7, n_bits));
         }
 
@@ -721,7 +774,10 @@ pub mod petrick {
                     essential_pi.extend_from_slice(&pi_vector_petricks[0]);
                 }
                 if show_info {
-                    println!("8] reduce with Petricks method: number essential PIs = {}", essential_pi.len());
+                    println!(
+                        "8] reduce with Petricks method: number essential PIs = {}",
+                        essential_pi.len()
+                    );
                 }
             } else {
                 let mut pi_set = BTreeSet::new();
@@ -736,23 +792,30 @@ pub mod petrick {
 
         for &pi in &primary_essential_pi {
             if show_info {
-                println!("INFO: b650c460: adding primary essential PI to result: {}",
-                         minterm_to_string::<E>(n_bits, pi));
+                println!(
+                    "INFO: b650c460: adding primary essential PI to result: {}",
+                    minterm_to_string::<E>(n_bits, pi)
+                );
             }
             essential_pi.push(pi);
         }
 
         for &pi in &secondary_essential_pi {
             if show_info {
-                println!("INFO: e2c83d65: adding secondary essential PI to result: {}",
-                         minterm_to_string::<E>(n_bits, pi));
+                println!(
+                    "INFO: e2c83d65: adding secondary essential PI to result: {}",
+                    minterm_to_string::<E>(n_bits, pi)
+                );
             }
             essential_pi.push(pi);
         }
 
         if show_info {
-            println!("INFO: 6b723975: simplify removed {} from (initially) {} PIs",
-                     prime_implicants.len() - essential_pi.len(), prime_implicants.len());
+            println!(
+                "INFO: 6b723975: simplify removed {} from (initially) {} PIs",
+                prime_implicants.len() - essential_pi.len(),
+                prime_implicants.len()
+            );
         }
 
         essential_pi
@@ -784,14 +847,15 @@ pub fn reduce_qm<E: MintermEncoding>(
 
     // Validate OptimizedFor if provided
     if let Some(optimized_for) = of
-        && !E::is_compatible_with(optimized_for) {
-            eprintln!(
-                "WARNING: OptimizedFor {:?} (max {} bits) may be incompatible with {} variables",
-                optimized_for,
-                optimized_for.max_bits(),
-                n_variables
-            );
-        }
+        && !E::is_compatible_with(optimized_for)
+    {
+        eprintln!(
+            "WARNING: OptimizedFor {:?} (max {} bits) may be incompatible with {} variables",
+            optimized_for,
+            optimized_for.max_bits(),
+            n_variables
+        );
+    }
     let mut minterms = minterms_input.to_vec();
     let mut iteration = 0;
     let mut fixed_point = false;
@@ -806,10 +870,20 @@ pub fn reduce_qm<E: MintermEncoding>(
         fixed_point = minterms == next_minterms;
 
         if show_info {
-            println!("INFO: 361a49a4: reduce_qm: iteration {}; minterms {}; next minterms {}",
-                     iteration, minterms.len(), next_minterms.len());
-            println!("INFO: 49ecfd1e: old minterms = {}", minterms_to_string::<E>(n_variables, &minterms));
-            println!("INFO: ed11b7c0: new minterms = {}", minterms_to_string::<E>(n_variables, &next_minterms));
+            println!(
+                "INFO: 361a49a4: reduce_qm: iteration {}; minterms {}; next minterms {}",
+                iteration,
+                minterms.len(),
+                next_minterms.len()
+            );
+            println!(
+                "INFO: 49ecfd1e: old minterms = {}",
+                minterms_to_string::<E>(n_variables, &minterms)
+            );
+            println!(
+                "INFO: ed11b7c0: new minterms = {}",
+                minterms_to_string::<E>(n_variables, &next_minterms)
+            );
         }
 
         iteration += 1;
@@ -817,7 +891,13 @@ pub fn reduce_qm<E: MintermEncoding>(
     }
 
     if use_petrick_simplify {
-        petrick::petrick_simplify::<E>(&minterms, minterms_input, n_variables, use_petrick_cnf2dnf, show_info)
+        petrick::petrick_simplify::<E>(
+            &minterms,
+            minterms_input,
+            n_variables,
+            use_petrick_cnf2dnf,
+            show_info,
+        )
     } else {
         minterms
     }
@@ -952,9 +1032,18 @@ mod tests {
     #[test]
     fn test_recommended_optimized_for() {
         // Test that each encoding recommends the correct OptimizedFor
-        assert_eq!(Enc16::recommended_optimized_for(), OptimizedFor::Avx512_16bits);
-        assert_eq!(Enc32::recommended_optimized_for(), OptimizedFor::Avx512_32bits);
-        assert_eq!(Enc64::recommended_optimized_for(), OptimizedFor::Avx512_64bits);
+        assert_eq!(
+            Enc16::recommended_optimized_for(),
+            OptimizedFor::Avx512_16bits
+        );
+        assert_eq!(
+            Enc32::recommended_optimized_for(),
+            OptimizedFor::Avx512_32bits
+        );
+        assert_eq!(
+            Enc64::recommended_optimized_for(),
+            OptimizedFor::Avx512_64bits
+        );
     }
 
     #[test]
@@ -962,25 +1051,15 @@ mod tests {
         // Test that reduce_qm rejects too many variables
         let minterms: Vec<u32> = vec![1, 3];
         let result = reduce_qm::<Enc16>(
-            &minterms,
-            20, // Exceeds MAX_VARS for Encoding16 (16)
-            false,
-            false,
-            false,
-            None,
-            false,
+            &minterms, 20, // Exceeds MAX_VARS for Encoding16 (16)
+            false, false, false, None, false,
         );
         assert!(result.is_empty()); // Should return empty due to validation failure
 
         // Test that reduce_qm accepts valid variable count
         let result = reduce_qm::<Enc16>(
-            &minterms,
-            8, // Within MAX_VARS for Encoding16
-            false,
-            false,
-            false,
-            None,
-            false,
+            &minterms, 8, // Within MAX_VARS for Encoding16
+            false, false, false, None, false,
         );
         assert!(!result.is_empty()); // Should succeed
     }

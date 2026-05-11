@@ -18,7 +18,12 @@ fn main() {
 
     for opt in &optimizations {
         let supported = if opt.is_supported() { "✓" } else { "✗" };
-        println!("{} {:25} (max {} bits)", supported, opt.to_string(), opt.max_bits());
+        println!(
+            "{} {:25} (max {} bits)",
+            supported,
+            opt.to_string(),
+            opt.max_bits()
+        );
     }
 
     println!("\n=== Auto-Detection ===");

@@ -213,9 +213,6 @@ mod tests {
     #[test]
     fn test_parse_double_not() {
         let expr = parse_bool_expr("!!a").unwrap();
-        assert_eq!(
-            expr,
-            BoolExpr::negate(BoolExpr::negate(BoolExpr::var("a")))
-        );
+        assert_eq!(expr, BoolExpr::negate(BoolExpr::negate(BoolExpr::var("a"))));
     }
 }

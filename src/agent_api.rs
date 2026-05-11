@@ -16,8 +16,8 @@
 //! - Optimization suggestions
 
 use crate::simplify::{
-    analyze_branches, format_bool_expr, parse_bool_expr, simplify_branches, BranchSet,
-    SimplificationResult, VariableType,
+    BranchSet, SimplificationResult, VariableType, analyze_branches, format_bool_expr,
+    parse_bool_expr, simplify_branches,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -63,17 +63,11 @@ impl VariableSpec {
                 "boolean" | "bool" => Ok(VariableType::Boolean),
                 _ => Err(format!("Unknown type: {}", s)),
             },
-            VariableSpec::Full {
-                var_type,
-                min,
-                max,
-            } => match var_type.as_str() {
+            VariableSpec::Full { var_type, min, max } => match var_type.as_str() {
                 "boolean" | "bool" => Ok(VariableType::Boolean),
                 "integer" | "int" => {
                     let min = min.unwrap_or(0);
-                    let max = max.ok_or_else(|| {
-                        "Integer type requires 'max' field".to_string()
-                    })?;
+                    let max = max.ok_or_else(|| "Integer type requires 'max' field".to_string())?;
                     Ok(VariableType::Integer { min, max })
                 }
                 _ => Err(format!("Unknown type: {}", var_type)),
@@ -363,9 +357,7 @@ fn build_response(
         .uncovered_minterms
         .iter()
         .take(10) // Limit to first 10
-        .map(|&minterm| {
-            crate::simplify::format_minterm(minterm, &result.variables)
-        })
+        .map(|&minterm| crate::simplify::format_minterm(minterm, &result.variables))
         .collect();
 
     // Find overlaps
@@ -391,12 +383,8 @@ fn build_response(
     };
 
     // Generate suggestions
-    let suggestions = generate_suggestions(
-        &request,
-        &result,
-        &analysis_result,
-        &simplified_branches,
-    );
+    let suggestions =
+        generate_suggestions(&request, &result, &analysis_result, &simplified_branches);
 
     // Calculate metrics
     let metrics = ComplexityMetrics {
@@ -425,13 +413,13 @@ fn generate_suggestions(
 
     // Simplification suggestion - only if there's actual complexity reduction
     if result.complexity_reduction() > 0.0 {
-        let language = request
-            .context
-            .language
-            .as_deref()
-            .unwrap_or("generic");
+        let language = request.context.language.as_deref().unwrap_or("generic");
 
-        let code = generate_code(simplified, language, request.context.original_code.as_deref());
+        let code = generate_code(
+            simplified,
+            language,
+            request.context.original_code.as_deref(),
+        );
 
         suggestions.push(Suggestion {
             kind: "simplification".to_string(),
@@ -449,7 +437,8 @@ fn generate_suggestions(
         });
     } else if result.complexity_reduction() == 0.0
         && analysis.dead_code.is_empty()
-        && analysis.overlaps.is_empty() {
+        && analysis.overlaps.is_empty()
+    {
         // No simplification possible and no issues found
         suggestions.push(Suggestion {
             kind: "no_change".to_string(),
@@ -490,7 +479,11 @@ fn generate_suggestions(
 }
 
 /// Generate code in target language
-fn generate_code(branches: &[SimplifiedBranch], language: &str, original_code: Option<&str>) -> String {
+fn generate_code(
+    branches: &[SimplifiedBranch],
+    language: &str,
+    original_code: Option<&str>,
+) -> String {
     let mut result = String::new();
 
     // Add original code as comments if provided
@@ -537,7 +530,10 @@ fn generate_go_code(branches: &[SimplifiedBranch]) -> String {
         if branch.is_default {
             code.push_str(&format!("{}\n", branch.output));
         } else if i == 0 {
-            code.push_str(&format!("if {} {{\n\t{}\n}}\n", branch.condition, branch.output));
+            code.push_str(&format!(
+                "if {} {{\n\t{}\n}}\n",
+                branch.condition, branch.output
+            ));
         } else {
             code.push_str(&format!(
                 "else if {} {{\n\t{}\n}}\n",
@@ -560,7 +556,10 @@ fn generate_rust_code(branches: &[SimplifiedBranch]) -> String {
                 code.push_str("}\n");
             }
         } else if i == 0 {
-            code.push_str(&format!("if {} {{\n\t{}\n}}\n", branch.condition, branch.output));
+            code.push_str(&format!(
+                "if {} {{\n\t{}\n}}\n",
+                branch.condition, branch.output
+            ));
         } else {
             code.push_str(&format!(
                 "else if {} {{\n\t{}\n}}\n",
@@ -609,7 +608,10 @@ fn generate_python_code(branches: &[SimplifiedBranch]) -> String {
         } else if i == 0 {
             code.push_str(&format!("if {}:\n\t{}\n", branch.condition, branch.output));
         } else {
-            code.push_str(&format!("elif {}:\n\t{}\n", branch.condition, branch.output));
+            code.push_str(&format!(
+                "elif {}:\n\t{}\n",
+                branch.condition, branch.output
+            ));
         }
     }
     code

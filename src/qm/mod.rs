@@ -26,15 +26,15 @@
 //! - [`classic`] - C++ API-compatible functions and utilities
 
 // Core algorithm modules
-pub mod implicant;
-pub mod quine_mccluskey;
-pub mod petricks_method;
 pub mod gray_code;
+pub mod implicant;
+pub mod petricks_method;
+pub mod quine_mccluskey;
 pub mod simd_coverage;
 
 // High-level interface
-pub mod qm_solver;
 pub mod qm_result;
+pub mod qm_solver;
 
 // Encoding and data structures
 pub mod encoding;
@@ -50,14 +50,17 @@ pub mod classic;
 mod min_cubes;
 pub use min_cubes::comb;
 pub use min_cubes::primes;
-pub use min_cubes::setcover::{covers, SetCoverSolution, SetCoverSolver, solve_set_cover, get_solver};
+pub use min_cubes::primes_adaptive;
+pub use min_cubes::setcover::{
+    SetCoverSolution, SetCoverSolver, covers, get_solver, solve_set_cover,
+};
 
 // Re-export main types for convenience
 pub use implicant::{BitState, Implicant};
-pub use quine_mccluskey::QuineMcCluskey;
 pub use petricks_method::PetricksMethod;
 pub use qm_result::QMResult;
 pub use qm_solver::QMSolver;
+pub use quine_mccluskey::QuineMcCluskey;
 pub use simd_coverage::CoverageMatrix;
 
 // Re-export encoding types

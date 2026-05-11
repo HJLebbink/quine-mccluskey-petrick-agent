@@ -62,10 +62,7 @@ pub fn analyze_branches(branch_set: &BranchSet) -> Result<SimplificationAnalysis
     let mut dead_branches = Vec::new();
 
     // Initialize assignments
-    let mut assignments: Vec<i32> = variables
-        .iter()
-        .map(|v| var_types[v].min_value())
-        .collect();
+    let mut assignments: Vec<i32> = variables.iter().map(|v| var_types[v].min_value()).collect();
 
     // Analyze each branch in order
     for (branch_idx, branch) in branch_set.branches.iter().enumerate() {
@@ -103,9 +100,10 @@ pub fn analyze_branches(branch_set: &BranchSet) -> Result<SimplificationAnalysis
                     // Find which branch(es) already covered this
                     for (prev_idx, prev_coverage) in branch_coverage.iter().enumerate() {
                         if prev_coverage.minterms_covered.contains(&minterm_idx)
-                            && !overlaps_with.contains(&prev_idx) {
-                                overlaps_with.push(prev_idx);
-                            }
+                            && !overlaps_with.contains(&prev_idx)
+                        {
+                            overlaps_with.push(prev_idx);
+                        }
                     }
                 }
             }
@@ -209,14 +207,8 @@ mod tests {
         // if a || b { return "1" }  // Covers [1,2,3]
         // elif a && b { return "2" }  // Covers [3] - already covered! DEAD CODE
         let mut branches = BranchSet::new();
-        branches.add_branch(
-            BoolExpr::or(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
-        branches.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "2",
-        );
+        branches.add_branch(BoolExpr::or(BoolExpr::var("a"), BoolExpr::var("b")), "1");
+        branches.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "2");
 
         let analysis = analyze_branches(&branches).unwrap();
 
@@ -226,7 +218,10 @@ mod tests {
         // Branch 2 should be detected as dead code
         assert_eq!(analysis.dead_branches.len(), 1);
         assert_eq!(analysis.dead_branches[0].branch_index, 1);
-        assert_eq!(analysis.dead_branches[0].reason, DeadCodeReason::FullyCovered);
+        assert_eq!(
+            analysis.dead_branches[0].reason,
+            DeadCodeReason::FullyCovered
+        );
         assert_eq!(analysis.dead_branches[0].covered_by, vec![0]);
     }
 
@@ -235,10 +230,7 @@ mod tests {
         // if a && b { return "1" }  // Covers [3]
         // elif a { return "2" }     // Covers [2, 3] - overlaps with branch 0!
         let mut branches = BranchSet::new();
-        branches.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branches.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         branches.add_branch(BoolExpr::var("a"), "2");
 
         let analysis = analyze_branches(&branches).unwrap();
@@ -256,10 +248,7 @@ mod tests {
         // if a && b { return "1" }  // Only covers [3]
         // No default - minterms [0, 1, 2] are uncovered
         let mut branches = BranchSet::new();
-        branches.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branches.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         // No default
 
         let analysis = analyze_branches(&branches).unwrap();

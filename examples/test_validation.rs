@@ -16,7 +16,10 @@ fn main() {
     // This should fail: 16 bits with Avx512_8bits (max 8)
     println!("Test 2: 16 variables with Avx512_8bits (should fail)");
     let result = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 16, OptimizedFor::Avx512_8bits).unwrap();
-    println!("  Result: {} terms (empty = validation failed)\n", result.len());
+    println!(
+        "  Result: {} terms (empty = validation failed)\n",
+        result.len()
+    );
 
     // This should work: 16 bits with Avx512_16bits
     println!("Test 3: 16 variables with Avx512_16bits (should work)");

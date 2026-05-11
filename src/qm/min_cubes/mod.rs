@@ -6,6 +6,11 @@
 
 pub mod comb;
 pub mod primes;
+pub mod primes_adaptive;
 pub mod setcover;
 
-pub use primes::{find_prime_implicants, populate_covered_minterms_u64, prime_cubes_to_implicants, TruthTable};
+pub use primes::{
+    TruthTable, find_prime_implicants, populate_covered_minterms_u64, prime_cubes_to_implicants,
+};
+#[allow(unused_imports)]
+pub use primes_adaptive::find_prime_implicants_adaptive;

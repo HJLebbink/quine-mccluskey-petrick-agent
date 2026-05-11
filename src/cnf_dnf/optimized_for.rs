@@ -19,7 +19,6 @@ pub enum OptimizedFor {
 }
 
 impl OptimizedFor {
-
     /// Returns the maximum number of bits this optimization level can handle
     pub const fn max_bits(self) -> usize {
         match self {
@@ -56,8 +55,7 @@ impl OptimizedFor {
         #[cfg(target_arch = "x86_64")]
         {
             // Check for AVX-512 support
-            if std::is_x86_feature_detected!("avx512f")
-                && std::is_x86_feature_detected!("avx512bw")
+            if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512bw")
             {
                 // Choose AVX-512 variant based on number of variables
                 if n_variables <= 8 {
@@ -129,8 +127,12 @@ impl OptimizedFor {
             Self::AutoDetect | Self::X64 => true,
 
             #[cfg(target_arch = "x86_64")]
-            Self::Avx512_8bits | Self::Avx512_16bits | Self::Avx512_32bits | Self::Avx512_64bits => {
-                std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512bw")
+            Self::Avx512_8bits
+            | Self::Avx512_16bits
+            | Self::Avx512_32bits
+            | Self::Avx512_64bits => {
+                std::is_x86_feature_detected!("avx512f")
+                    && std::is_x86_feature_detected!("avx512bw")
             }
 
             #[cfg(target_arch = "x86_64")]
@@ -138,7 +140,11 @@ impl OptimizedFor {
 
             // On non-x86_64 platforms, only X64 and AutoDetect are supported
             #[cfg(not(target_arch = "x86_64"))]
-            Self::Avx512_8bits | Self::Avx512_16bits | Self::Avx512_32bits | Self::Avx512_64bits | Self::Avx2_64bits => false,
+            Self::Avx512_8bits
+            | Self::Avx512_16bits
+            | Self::Avx512_32bits
+            | Self::Avx512_64bits
+            | Self::Avx2_64bits => false,
         }
     }
 

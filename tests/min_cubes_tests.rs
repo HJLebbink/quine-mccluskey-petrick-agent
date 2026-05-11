@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
 //! Comprehensive tests for min-cubes algorithms
-//! 
+//!
 //! Phase 7: Thorough testing requirement - every public function tested.
 //! Every test must verify correctness, not just that it doesn't crash.
 
 use qm_agent::qm::comb;
-use qm_agent::qm::primes::{PrimeCube, TruthTable, find_prime_implicants};
 use qm_agent::qm::covers;
+use qm_agent::qm::primes::{PrimeCube, TruthTable, find_prime_implicants};
 use std::mem::MaybeUninit;
 
 // ============================================================================
@@ -39,8 +39,19 @@ mod comb_tests {
             for k in 1..n {
                 let val = comb::choose(n, k);
                 let sum = comb::choose(n - 1, k - 1) + comb::choose(n - 1, k);
-                assert_eq!(val, sum, "Pascal identity failed: C({}, {}) = {} != C({}, {}) + C({}, {}) = {}",
-                    n, k, val, n-1, k-1, n-1, k, comb::choose(n-1, k-1) + comb::choose(n-1, k));
+                assert_eq!(
+                    val,
+                    sum,
+                    "Pascal identity failed: C({}, {}) = {} != C({}, {}) + C({}, {}) = {}",
+                    n,
+                    k,
+                    val,
+                    n - 1,
+                    k - 1,
+                    n - 1,
+                    k,
+                    comb::choose(n - 1, k - 1) + comb::choose(n - 1, k)
+                );
             }
         }
     }
@@ -68,15 +79,18 @@ mod comb_tests {
         let mut iter = comb::CombinationIterator::new(4, 2).unwrap();
         let mut buf = MaybeUninit::<[u32; 16]>::uninit();
         let mut results = Vec::new();
-        
+
         while iter.next() {
             iter.indices(&mut buf);
             let indices = unsafe { buf.assume_init() };
             results.push([indices[0], indices[1]]);
         }
-        
+
         assert_eq!(results.len(), 6);
-        assert_eq!(results, vec![[0,1], [0,2], [0,3], [1,2], [1,3], [2,3]]);
+        assert_eq!(
+            results,
+            vec![[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
+        );
     }
 
     #[test]
@@ -84,16 +98,16 @@ mod comb_tests {
         let mut iter = comb::CombinationIterator::new(5, 3).unwrap();
         let mut buf = MaybeUninit::<[u32; 16]>::uninit();
         let mut results = Vec::new();
-        
+
         while iter.next() {
             iter.indices(&mut buf);
             let indices = unsafe { buf.assume_init() };
             results.push([indices[0], indices[1], indices[2]]);
         }
-        
+
         assert_eq!(results.len(), 10);
-        assert_eq!(results[0], [0,1,2]);
-        assert_eq!(results[9], [2,3,4]);
+        assert_eq!(results[0], [0, 1, 2]);
+        assert_eq!(results[9], [2, 3, 4]);
     }
 
     #[test]
@@ -119,8 +133,8 @@ mod comb_tests {
     fn test_enumerate_all_5c2() {
         let c = comb::enumerate_all(5, 2);
         assert_eq!(c.len(), 10);
-        assert_eq!(c[0], [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
-        assert_eq!(c[9], [3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+        assert_eq!(c[0], [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(c[9], [3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
@@ -232,7 +246,7 @@ mod truth_table_tests {
 
     #[test]
     fn test_tt_all_minterms() {
-        let tt = TruthTable::from_minterms(3, &[0,1,2,3,4,5,6,7], &[]).unwrap();
+        let tt = TruthTable::from_minterms(3, &[0, 1, 2, 3, 4, 5, 6, 7], &[]).unwrap();
         assert_eq!(tt.pos_rows, 8);
         assert_eq!(tt.neg_rows, 1);
     }
@@ -298,23 +312,28 @@ mod pi_generation_tests {
 
     #[test]
     fn test_pi_or_3() {
-        let tt = TruthTable::from_minterms(3, &[1,2,3,4,5,6,7], &[]).unwrap();
+        let tt = TruthTable::from_minterms(3, &[1, 2, 3, 4, 5, 6, 7], &[]).unwrap();
         let pis = find_prime_implicants(&tt, 3);
         assert!(pis.len() <= 7);
     }
 
     #[test]
     fn test_pi_xor_3() {
-        let tt = TruthTable::from_minterms(3, &[1,2,4,7], &[]).unwrap();
+        let tt = TruthTable::from_minterms(3, &[1, 2, 4, 7], &[]).unwrap();
         let pis = find_prime_implicants(&tt, 3);
         assert!(pis.len() >= 2);
     }
 
     #[test]
     fn test_pi_no_duplicate_cube_structures() {
-        let tt = TruthTable::from_minterms(4, &[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], &[]).unwrap();
+        let tt = TruthTable::from_minterms(
+            4,
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            &[],
+        )
+        .unwrap();
         let pis = find_prime_implicants(&tt, 4);
-        
+
         let mut seen = Vec::new();
         for pc in &pis {
             let key = (pc.cond, pc.mask, pc.data);
@@ -325,14 +344,20 @@ mod pi_generation_tests {
 
     #[test]
     fn test_pi_no_subsumed_pis() {
-        let tt = TruthTable::from_minterms(4, &[0,1,2,3], &[]).unwrap();
+        let tt = TruthTable::from_minterms(4, &[0, 1, 2, 3], &[]).unwrap();
         let pis = find_prime_implicants(&tt, 4);
-        
+
         for (i, pi_i) in pis.iter().enumerate() {
             for (j, pi_j) in pis.iter().enumerate() {
                 if i != j {
-                    assert!(!pi_j.subsumes(*pi_i), 
-                        "PI {} subsumed by PI {}: {:?} vs {:?}", i, j, pi_j, pi_i);
+                    assert!(
+                        !pi_j.subsumes(*pi_i),
+                        "PI {} subsumed by PI {}: {:?} vs {:?}",
+                        i,
+                        j,
+                        pi_j,
+                        pi_i
+                    );
                 }
             }
         }
@@ -340,13 +365,17 @@ mod pi_generation_tests {
 
     #[test]
     fn test_pi_all_cover_valid_minterms() {
-        let tt = TruthTable::from_minterms(3, &[0,1,2,3], &[]).unwrap();
+        let tt = TruthTable::from_minterms(3, &[0, 1, 2, 3], &[]).unwrap();
         let pis = find_prime_implicants(&tt, 3);
-        
+
         for pc in &pis {
             for invalid_mt in 4..8 {
-                assert!(!covers(pc, invalid_mt),
-                    "PI {:?} covers invalid minterm {}", pc, invalid_mt);
+                assert!(
+                    !covers(pc, invalid_mt),
+                    "PI {:?} covers invalid minterm {}",
+                    pc,
+                    invalid_mt
+                );
             }
         }
     }
@@ -360,13 +389,21 @@ mod pi_generation_tests {
 
     #[test]
     fn test_pi_4vars_basic() {
-        let tt = TruthTable::from_minterms(4, &[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], &[]).unwrap();
+        let tt = TruthTable::from_minterms(
+            4,
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            &[],
+        )
+        .unwrap();
         let pis = find_prime_implicants(&tt, 4);
         // When all minterms present, should find at least one PI
         assert!(!pis.is_empty(), "Should find PIs for full function");
         // Some PIs should have high generality (many don't-cares)
         let has_general = pis.iter().any(|pc| pc.dim() <= 2);
-        assert!(has_general || pis.len() > 0, "Should find general PIs or at least some PIs");
+        assert!(
+            has_general || pis.len() > 0,
+            "Should find general PIs or at least some PIs"
+        );
     }
 }
 
@@ -386,7 +423,7 @@ mod integration_tests {
 
     #[test]
     fn test_full_flow_xor_3() {
-        let tt = TruthTable::from_minterms(3, &[1,2,4,7], &[]).unwrap();
+        let tt = TruthTable::from_minterms(3, &[1, 2, 4, 7], &[]).unwrap();
         let pis = find_prime_implicants(&tt, 3);
         assert!(!pis.is_empty());
     }
@@ -395,7 +432,7 @@ mod integration_tests {
     fn test_coverage_consistency() {
         let pis = vec![PrimeCube::new(1, 0, 0), PrimeCube::new(2, 0, 0)];
         let mts = vec![0, 1, 2, 3];
-        
+
         for (i, pc) in pis.iter().enumerate() {
             for (j, mt) in mts.iter().enumerate() {
                 let direct = covers(pc, *mt);

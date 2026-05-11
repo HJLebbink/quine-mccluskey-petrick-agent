@@ -6,16 +6,16 @@
 #![feature(adt_const_params)]
 #![allow(incomplete_features)]
 
-pub mod qm;        // Quine-McCluskey algorithm and solver
-pub mod cnf_dnf;   // CNF to DNF conversion with SIMD
-pub mod simplify;  // If-then-else simplification
-pub mod agent_api; // JSON API for Claude integration
+pub mod agent_api;
+pub mod cnf_dnf; // CNF to DNF conversion with SIMD
+pub mod qm; // Quine-McCluskey algorithm and solver
+pub mod simplify; // If-then-else simplification // JSON API for Claude integration
 
 // Re-export the main types
-pub use qm::{QMSolver, QMResult};
-pub use qm::{QuineMcCluskey, Implicant, BitState};
 pub use qm::PetricksMethod;
+pub use qm::{BitState, Implicant, QuineMcCluskey};
 pub use qm::{Enc16, Enc32, Enc64, MintermEncoding};
+pub use qm::{QMResult, QMSolver};
 
 /// Convenience function to minimize a Boolean function (up to 64 variables)
 ///
@@ -26,7 +26,7 @@ pub use qm::{Enc16, Enc32, Enc64, MintermEncoding};
 pub fn minimize_function(
     minterms: &[u64],
     dont_cares: Option<&[u64]>,
-    variables: usize
+    variables: usize,
 ) -> QMResult {
     if variables <= 16 {
         // Use Enc16 with u32 storage
@@ -82,9 +82,7 @@ pub fn generate_variable_names(count: usize) -> Vec<String> {
 
 /// Parse a minterm string like "1,3,7,15"
 pub fn parse_minterms(input: &str) -> Result<Vec<u64>, std::num::ParseIntError> {
-    input.split(',')
-        .map(|s| s.trim().parse())
-        .collect()
+    input.split(',').map(|s| s.trim().parse()).collect()
 }
 
 #[cfg(test)]

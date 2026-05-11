@@ -1,11 +1,11 @@
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand, ValueEnum};
+use qm_agent::agent_api;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read, Write};
-use regex::Regex;
-use anyhow::{Result, anyhow};
-use qm_agent::agent_api;
 
 /// Quine-McCluskey Boolean minimization agent for Claude
 #[derive(Parser)]
@@ -86,12 +86,13 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Minimize { input, format, show_steps, include_pos } => {
-            handle_minimize(&input, format, show_steps, include_pos)
-        }
-        Commands::Simplify { input, pretty } => {
-            handle_simplify(input.as_deref(), pretty)
-        }
+        Commands::Minimize {
+            input,
+            format,
+            show_steps,
+            include_pos,
+        } => handle_minimize(&input, format, show_steps, include_pos),
+        Commands::Simplify { input, pretty } => handle_simplify(input.as_deref(), pretty),
         Commands::Interactive => handle_interactive(),
         Commands::Examples => handle_examples(),
     };
@@ -128,9 +129,10 @@ fn handle_minimize(
 fn parse_input(input: &str) -> Result<QMRequest> {
     // Try parsing as file path first
     if let Ok(file_content) = fs::read_to_string(input)
-        && let Ok(request) = serde_json::from_str::<QMRequest>(&file_content) {
-            return Ok(request);
-        }
+        && let Ok(request) = serde_json::from_str::<QMRequest>(&file_content)
+    {
+        return Ok(request);
+    }
 
     // Try parsing as inline JSON
     if let Ok(request) = serde_json::from_str::<QMRequest>(input) {
@@ -145,18 +147,20 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
     let input = input.trim();
 
     // Pattern 1: f(A,B,C) = Σ(1,3,7) + d(2,4)
-    let sigma_pattern = Regex::new(r"f\(([A-Z,\s]+)\)\s*=\s*Σ\(([0-9,\s]+)\)(?:\s*\+\s*d\(([0-9,\s]*)\))?")?;
+    let sigma_pattern =
+        Regex::new(r"f\(([A-Z,\s]+)\)\s*=\s*Σ\(([0-9,\s]+)\)(?:\s*\+\s*d\(([0-9,\s]*)\))?")?;
     if let Some(caps) = sigma_pattern.captures(input) {
-        let variables: Vec<String> = caps[1].split(',')
-            .map(|s| s.trim().to_string())
-            .collect();
-        let minterms: Vec<u32> = caps[2].split(',')
+        let variables: Vec<String> = caps[1].split(',').map(|s| s.trim().to_string()).collect();
+        let minterms: Vec<u32> = caps[2]
+            .split(',')
             .map(|s| s.trim().parse())
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow!("Failed to parse minterm: {}", e))?;
-        let dont_cares: Option<Vec<u32>> = caps.get(3)
+        let dont_cares: Option<Vec<u32>> = caps
+            .get(3)
             .map(|m| -> Result<Vec<u32>> {
-                m.as_str().split(',')
+                m.as_str()
+                    .split(',')
                     .filter(|s| !s.trim().is_empty())
                     .map(|s| s.trim().parse())
                     .collect::<Result<Vec<_>, _>>()
@@ -174,9 +178,11 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
     }
 
     // Pattern 2: "minimize minterms 1,3,7 with 3 variables"
-    let simple_pattern = Regex::new(r"minimize\s+minterms?\s+([0-9,\s]+)\s+with\s+(\d+)\s+variables?")?;
+    let simple_pattern =
+        Regex::new(r"minimize\s+minterms?\s+([0-9,\s]+)\s+with\s+(\d+)\s+variables?")?;
     if let Some(caps) = simple_pattern.captures(input) {
-        let minterms: Vec<u32> = caps[1].split(',')
+        let minterms: Vec<u32> = caps[1]
+            .split(',')
             .map(|s| s.trim().parse())
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow!("Failed to parse minterm: {}", e))?;
@@ -196,7 +202,8 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
     if let Some(caps) = tt_pattern.captures(input) {
         let truth_table = &caps[1];
         let variables = (truth_table.len() as f64).log2() as usize;
-        let minterms: Vec<u32> = truth_table.chars()
+        let minterms: Vec<u32> = truth_table
+            .chars()
             .enumerate()
             .filter_map(|(i, c)| if c == '1' { Some(i as u32) } else { None })
             .collect();
@@ -210,28 +217,38 @@ fn parse_natural_input(input: &str) -> Result<QMRequest> {
         });
     }
 
-    Err(anyhow!("Could not parse input format. Supported formats:\n\
+    Err(anyhow!(
+        "Could not parse input format. Supported formats:\n\
         - JSON: {{\"minterms\": [1,3,7], \"variables\": 3}}\n\
         - Function notation: f(A,B,C) = Σ(1,3,7)\n\
         - With don't cares: f(A,B,C) = Σ(1,3,7) + d(2,4)\n\
         - Simple: minimize minterms 1,3,7 with 3 variables\n\
-        - Truth table: truth table: 00110110"))
+        - Truth table: truth table: 00110110"
+    ))
 }
 
-fn run_quine_mccluskey(request: &QMRequest, show_steps: bool, include_pos: bool) -> Result<QMResponse> {
+fn run_quine_mccluskey(
+    request: &QMRequest,
+    show_steps: bool,
+    include_pos: bool,
+) -> Result<QMResponse> {
     let empty_dont_cares = vec![];
     let dont_cares = request.dont_cares.as_ref().unwrap_or(&empty_dont_cares);
-    let variable_names = request.variable_names.as_ref()
-        .cloned()
-        .unwrap_or_else(|| {
-            (0..request.variables)
-                .map(|i| ((b'A' + i as u8) as char).to_string())
-                .collect()
-        });
+    let variable_names = request.variable_names.as_ref().cloned().unwrap_or_else(|| {
+        (0..request.variables)
+            .map(|i| ((b'A' + i as u8) as char).to_string())
+            .collect()
+    });
 
     // Use the actual QM implementation
     let (minimized_sop, prime_implicants_formatted, essential_pis_formatted, steps) =
-        integrate_your_qm_solver(&request.minterms, dont_cares, request.variables, &variable_names, show_steps);
+        integrate_your_qm_solver(
+            &request.minterms,
+            dont_cares,
+            request.variables,
+            &variable_names,
+            show_steps,
+        );
 
     let minimized_pos = if include_pos {
         Some(convert_to_pos(&minimized_sop))
@@ -246,8 +263,15 @@ fn run_quine_mccluskey(request: &QMRequest, show_steps: bool, include_pos: bool)
         minimized_pos,
         prime_implicants: prime_implicants_formatted,
         essential_prime_implicants: essential_pis_formatted,
-        cost_reduction: Some(calculate_cost_reduction(&request.minterms, request.variables)),
-        truth_table: Some(generate_truth_table(&request.minterms, dont_cares, request.variables)),
+        cost_reduction: Some(calculate_cost_reduction(
+            &request.minterms,
+            request.variables,
+        )),
+        truth_table: Some(generate_truth_table(
+            &request.minterms,
+            dont_cares,
+            request.variables,
+        )),
         steps,
     })
 }
@@ -257,9 +281,9 @@ fn integrate_your_qm_solver(
     dont_cares: &[u32],
     variables: usize,
     _variable_names: &[String],
-    show_steps: bool
+    show_steps: bool,
 ) -> (String, Vec<String>, Vec<String>, Option<Vec<String>>) {
-    use qm_agent::{QMSolver, Enc32};
+    use qm_agent::{Enc32, QMSolver};
 
     let mut solver = QMSolver::<Enc32>::new(variables);
 
@@ -282,7 +306,7 @@ fn integrate_your_qm_solver(
         result.minimized_expression,
         result.prime_implicants,
         result.essential_prime_implicants,
-        steps
+        steps,
     )
 }
 
@@ -427,21 +451,17 @@ fn handle_interactive() -> Result<()> {
             "help" => print_interactive_help(),
             "examples" => print_examples(),
             "" => continue,
-            _ => {
-                match parse_input(input) {
-                    Ok(request) => {
-                        match run_quine_mccluskey(&request, false, false) {
-                            Ok(result) => {
-                                println!();
-                                print_human_readable(&result);
-                                println!();
-                            }
-                            Err(e) => eprintln!("❌ Error processing: {}", e),
-                        }
+            _ => match parse_input(input) {
+                Ok(request) => match run_quine_mccluskey(&request, false, false) {
+                    Ok(result) => {
+                        println!();
+                        print_human_readable(&result);
+                        println!();
                     }
-                    Err(e) => eprintln!("❌ Parse error: {}", e),
-                }
-            }
+                    Err(e) => eprintln!("❌ Error processing: {}", e),
+                },
+                Err(e) => eprintln!("❌ Parse error: {}", e),
+            },
         }
     }
 
@@ -523,7 +543,9 @@ fn print_examples() {
     println!("   echo '{{...}}' | qm-agent simplify");
 
     println!("\n12. Inline JSON:");
-    println!("   qm-agent simplify -i '{{\"variables\": {{\"a\": \"boolean\"}}, \"branches\": [...]}}'");
+    println!(
+        "   qm-agent simplify -i '{{\"variables\": {{\"a\": \"boolean\"}}, \"branches\": [...]}}'"
+    );
 
     println!("\nRun library examples:");
     println!("   cargo run --example simplify_if_then_else");

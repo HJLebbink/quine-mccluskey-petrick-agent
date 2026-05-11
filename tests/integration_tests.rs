@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
-use tempfile::NamedTempFile;
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_minimize_simple_json() {
@@ -32,9 +32,7 @@ fn test_minimize_simple_format() {
 #[test]
 fn test_minimize_truth_table() {
     let mut cmd = Command::cargo_bin("qm-agent").unwrap();
-    cmd.arg("minimize")
-        .arg("-i")
-        .arg("truth table: 1010");
+    cmd.arg("minimize").arg("-i").arg("truth table: 1010");
 
     cmd.assert()
         .success()
@@ -71,10 +69,7 @@ fn test_minimize_table_format() {
 #[test]
 fn test_minimize_from_file() {
     let mut temp_file = NamedTempFile::new().unwrap();
-    writeln!(
-        temp_file,
-        r#"{{"minterms": [0, 2], "variables": 2}}"#
-    ).unwrap();
+    writeln!(temp_file, r#"{{"minterms": [0, 2], "variables": 2}}"#).unwrap();
 
     let mut cmd = Command::cargo_bin("qm-agent").unwrap();
     cmd.arg("minimize")
@@ -99,9 +94,7 @@ fn test_examples_command() {
 #[test]
 fn test_invalid_input() {
     let mut cmd = Command::cargo_bin("qm-agent").unwrap();
-    cmd.arg("minimize")
-        .arg("-i")
-        .arg("invalid input format");
+    cmd.arg("minimize").arg("-i").arg("invalid input format");
 
     cmd.assert()
         .failure()
@@ -113,9 +106,9 @@ fn test_help_message() {
     let mut cmd = Command::cargo_bin("qm-agent").unwrap();
     cmd.arg("--help");
 
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("Quine-McCluskey Boolean minimization agent"));
+    cmd.assert().success().stdout(predicate::str::contains(
+        "Quine-McCluskey Boolean minimization agent",
+    ));
 }
 
 #[test]

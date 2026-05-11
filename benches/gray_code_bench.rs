@@ -13,17 +13,19 @@
 // cargo bench --bench gray_code_bench -- level1_u32
 // cargo bench --bench gray_code_bench -- avx512_u32
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use qm_agent::qm::gray_code::{
-    find_gray_code_pairs_scalar_u32, find_gray_code_pairs_ref_u32,
-    find_gray_code_pairs_avx512_u32,
+    find_gray_code_pairs_avx512_u32, find_gray_code_pairs_ref_u32, find_gray_code_pairs_scalar_u32,
 };
 use std::hint::black_box;
 
 /// Generate test data: two groups of indices and their encodings
 /// This simulates a realistic QM scenario where we're checking gray code pairs
 /// between consecutive bit-count groups
-fn generate_test_data(group1_size: usize, group2_size: usize) -> (Vec<usize>, Vec<usize>, Vec<u32>) {
+fn generate_test_data(
+    group1_size: usize,
+    group2_size: usize,
+) -> (Vec<usize>, Vec<usize>, Vec<u32>) {
     let total_size = group1_size + group2_size;
     let mut raw_encodings = Vec::with_capacity(total_size);
 
@@ -71,16 +73,11 @@ fn bench_scalar_u32(c: &mut Criterion) {
     let mut group = c.benchmark_group("gray_code_scalar_u32");
 
     // Test different problem sizes
-    let sizes = [
-        (50, 50),
-        (100, 100),
-        (200, 200),
-        (500, 500),
-        (1000, 1000),
-    ];
+    let sizes = [(50, 50), (100, 100), (200, 200), (500, 500), (1000, 1000)];
 
     for (g1_size, g2_size) in sizes.iter() {
-        let (group1_indices, group2_indices, raw_encodings) = generate_test_data(*g1_size, *g2_size);
+        let (group1_indices, group2_indices, raw_encodings) =
+            generate_test_data(*g1_size, *g2_size);
         let total_checks = (g1_size * g2_size) as u64;
 
         group.throughput(Throughput::Elements(total_checks));
@@ -107,16 +104,11 @@ fn bench_level1_u32(c: &mut Criterion) {
     let mut group = c.benchmark_group("gray_code_level1_u32");
 
     // Test different problem sizes
-    let sizes = [
-        (50, 50),
-        (100, 100),
-        (200, 200),
-        (500, 500),
-        (1000, 1000),
-    ];
+    let sizes = [(50, 50), (100, 100), (200, 200), (500, 500), (1000, 1000)];
 
     for (g1_size, g2_size) in sizes.iter() {
-        let (group1_indices, group2_indices, raw_encodings) = generate_test_data(*g1_size, *g2_size);
+        let (group1_indices, group2_indices, raw_encodings) =
+            generate_test_data(*g1_size, *g2_size);
         let total_checks = (g1_size * g2_size) as u64;
 
         group.throughput(Throughput::Elements(total_checks));
@@ -125,11 +117,7 @@ fn bench_level1_u32(c: &mut Criterion) {
             &(group1_indices, group2_indices, raw_encodings),
             |b, (g1, g2, encodings)| {
                 b.iter(|| {
-                    find_gray_code_pairs_ref_u32(
-                        black_box(g1),
-                        black_box(g2),
-                        black_box(encodings),
-                    )
+                    find_gray_code_pairs_ref_u32(black_box(g1), black_box(g2), black_box(encodings))
                 })
             },
         );
@@ -153,7 +141,8 @@ fn bench_avx512_u32(c: &mut Criterion) {
     ];
 
     for (g1_size, g2_size) in sizes.iter() {
-        let (group1_indices, group2_indices, raw_encodings) = generate_test_data(*g1_size, *g2_size);
+        let (group1_indices, group2_indices, raw_encodings) =
+            generate_test_data(*g1_size, *g2_size);
         let total_checks = (g1_size * g2_size) as u64;
 
         group.throughput(Throughput::Elements(total_checks));
@@ -183,7 +172,8 @@ fn bench_comparison(c: &mut Criterion) {
     let sizes = [(100, 100), (500, 500), (1000, 1000)];
 
     for (g1_size, g2_size) in sizes.iter() {
-        let (group1_indices, group2_indices, raw_encodings) = generate_test_data(*g1_size, *g2_size);
+        let (group1_indices, group2_indices, raw_encodings) =
+            generate_test_data(*g1_size, *g2_size);
         let total_checks = (g1_size * g2_size) as u64;
 
         group.throughput(Throughput::Elements(total_checks));
@@ -191,7 +181,11 @@ fn bench_comparison(c: &mut Criterion) {
         // Scalar
         group.bench_with_input(
             BenchmarkId::new("scalar", format!("{}x{}", g1_size, g2_size)),
-            &(group1_indices.clone(), group2_indices.clone(), raw_encodings.clone()),
+            &(
+                group1_indices.clone(),
+                group2_indices.clone(),
+                raw_encodings.clone(),
+            ),
             |b, (g1, g2, encodings)| {
                 b.iter(|| {
                     find_gray_code_pairs_scalar_u32(
@@ -206,14 +200,14 @@ fn bench_comparison(c: &mut Criterion) {
         // Level1
         group.bench_with_input(
             BenchmarkId::new("level1", format!("{}x{}", g1_size, g2_size)),
-            &(group1_indices.clone(), group2_indices.clone(), raw_encodings.clone()),
+            &(
+                group1_indices.clone(),
+                group2_indices.clone(),
+                raw_encodings.clone(),
+            ),
             |b, (g1, g2, encodings)| {
                 b.iter(|| {
-                    find_gray_code_pairs_ref_u32(
-                        black_box(g1),
-                        black_box(g2),
-                        black_box(encodings),
-                    )
+                    find_gray_code_pairs_ref_u32(black_box(g1), black_box(g2), black_box(encodings))
                 })
             },
         );

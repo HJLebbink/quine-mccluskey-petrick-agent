@@ -39,7 +39,10 @@ fn main() {
         "canCreateTeams",
         "isRegionEU",
         "isRegionUS",
-    ].iter().map(|s| s.to_string()).collect();
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     // Create QM solver with variable names
     let mut solver = QMSolver::<Enc16>::with_variable_names(16, var_names);
@@ -92,8 +95,15 @@ fn main() {
     minterms.dedup();
     let n_minterms = minterms.len();
 
-    println!("   Generated {} minterms in {:?}", n_minterms, minterm_start.elapsed());
-    println!("   This represents {} truth table rows that evaluate to 'true'", n_minterms);
+    println!(
+        "   Generated {} minterms in {:?}",
+        n_minterms,
+        minterm_start.elapsed()
+    );
+    println!(
+        "   This represents {} truth table rows that evaluate to 'true'",
+        n_minterms
+    );
 
     // Set minterms
     println!();
@@ -123,8 +133,14 @@ fn main() {
     println!();
 
     println!("📊 Results:");
-    println!("   Prime implicants found: {}", result.prime_implicants.len());
-    println!("   Essential prime implicants: {}", result.essential_prime_implicants.len());
+    println!(
+        "   Prime implicants found: {}",
+        result.prime_implicants.len()
+    );
+    println!(
+        "   Essential prime implicants: {}",
+        result.essential_prime_implicants.len()
+    );
     if !result.minimized_expression.is_empty() {
         println!("   Minimized expression: {}", result.minimized_expression);
     }
@@ -137,7 +153,10 @@ fn main() {
     println!("   Time breakdown:");
     println!("   - Minterm generation: {:?}", minterm_start.elapsed());
     println!("   - Setting minterms: {:?}", set_start.elapsed());
-    println!("   - QM algorithm: {:?} ✅ (SIMD-accelerated)", solve_duration);
+    println!(
+        "   - QM algorithm: {:?} ✅ (SIMD-accelerated)",
+        solve_duration
+    );
     println!();
     println!("   ✅ OPTIMIZED (Oct 2025):");
     println!("   - Gray code checking: Vectorized with AVX512");

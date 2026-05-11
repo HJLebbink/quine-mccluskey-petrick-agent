@@ -7,10 +7,10 @@
 //
 // Tests are run with different problem sizes and patterns to show scaling behavior
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use qm_agent::cnf_dnf::{self, OptimizedFor};
 use qm_agent::qm::{Enc16, Enc32, Enc64};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::hint::black_box;
 
 /// Generate a random CNF formula for benchmarking
@@ -46,21 +46,33 @@ fn bench_encoding_types(c: &mut Criterion) {
     // Test Encoding16 (auto-selects Avx512_16bits)
     group.bench_function("Encoding16", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc16>(black_box(&cnf_small), black_box(8), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc16>(
+                black_box(&cnf_small),
+                black_box(8),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
     // Test Encoding32 (auto-selects Avx512_32bits)
     group.bench_function("Encoding32", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc32>(black_box(&cnf_small), black_box(8), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc32>(
+                black_box(&cnf_small),
+                black_box(8),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
     // Test Encoding64 (auto-selects Avx512_64bits)
     group.bench_function("Encoding64", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc64>(black_box(&cnf_small), black_box(8), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc64>(
+                black_box(&cnf_small),
+                black_box(8),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
@@ -85,7 +97,11 @@ fn bench_problem_sizes(c: &mut Criterion) {
         if n_vars <= 16 {
             group.bench_with_input(BenchmarkId::new("Encoding16", name), &cnf, |b, cnf| {
                 b.iter(|| {
-                    cnf_dnf::cnf_to_dnf::<Enc16>(black_box(cnf), black_box(n_vars), OptimizedFor::AutoDetect)
+                    cnf_dnf::cnf_to_dnf::<Enc16>(
+                        black_box(cnf),
+                        black_box(n_vars),
+                        OptimizedFor::AutoDetect,
+                    )
                 });
             });
         }
@@ -93,14 +109,22 @@ fn bench_problem_sizes(c: &mut Criterion) {
         if n_vars <= 32 {
             group.bench_with_input(BenchmarkId::new("Encoding32", name), &cnf, |b, cnf| {
                 b.iter(|| {
-                    cnf_dnf::cnf_to_dnf::<Enc32>(black_box(cnf), black_box(n_vars), OptimizedFor::AutoDetect)
+                    cnf_dnf::cnf_to_dnf::<Enc32>(
+                        black_box(cnf),
+                        black_box(n_vars),
+                        OptimizedFor::AutoDetect,
+                    )
                 });
             });
         }
 
         group.bench_with_input(BenchmarkId::new("Encoding64", name), &cnf, |b, cnf| {
             b.iter(|| {
-                cnf_dnf::cnf_to_dnf::<Enc64>(black_box(cnf), black_box(n_vars), OptimizedFor::AutoDetect)
+                cnf_dnf::cnf_to_dnf::<Enc64>(
+                    black_box(cnf),
+                    black_box(n_vars),
+                    OptimizedFor::AutoDetect,
+                )
             });
         });
     }
@@ -118,7 +142,11 @@ fn bench_encoding_variants(c: &mut Criterion) {
     group.throughput(Throughput::Elements(cnf_16.len() as u64));
     group.bench_function("Encoding16_16vars", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc16>(black_box(&cnf_16), black_box(16), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc16>(
+                black_box(&cnf_16),
+                black_box(16),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
@@ -127,7 +155,11 @@ fn bench_encoding_variants(c: &mut Criterion) {
     group.throughput(Throughput::Elements(cnf_32.len() as u64));
     group.bench_function("Encoding32_32vars", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc32>(black_box(&cnf_32), black_box(32), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc32>(
+                black_box(&cnf_32),
+                black_box(32),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
@@ -136,7 +168,11 @@ fn bench_encoding_variants(c: &mut Criterion) {
     group.throughput(Throughput::Elements(cnf_64.len() as u64));
     group.bench_function("Encoding64_64vars", |b| {
         b.iter(|| {
-            cnf_dnf::cnf_to_dnf::<Enc64>(black_box(&cnf_64), black_box(64), OptimizedFor::AutoDetect)
+            cnf_dnf::cnf_to_dnf::<Enc64>(
+                black_box(&cnf_64),
+                black_box(64),
+                OptimizedFor::AutoDetect,
+            )
         });
     });
 
@@ -156,7 +192,7 @@ fn bench_minimal_with_pruning(c: &mut Criterion) {
             cnf_dnf::cnf_to_dnf_minimal::<Enc16>(
                 black_box(&cnf),
                 black_box(16),
-                OptimizedFor::AutoDetect
+                OptimizedFor::AutoDetect,
             )
         });
     });
@@ -197,7 +233,7 @@ fn bench_conjunction_density(c: &mut Criterion) {
             cnf_dnf::cnf_to_dnf::<Enc16>(
                 black_box(&cnf_sparse),
                 black_box(n_vars),
-                OptimizedFor::AutoDetect
+                OptimizedFor::AutoDetect,
             )
         });
     });
@@ -210,7 +246,7 @@ fn bench_conjunction_density(c: &mut Criterion) {
             cnf_dnf::cnf_to_dnf::<Enc16>(
                 black_box(&cnf_medium),
                 black_box(n_vars),
-                OptimizedFor::AutoDetect
+                OptimizedFor::AutoDetect,
             )
         });
     });
@@ -223,7 +259,7 @@ fn bench_conjunction_density(c: &mut Criterion) {
             cnf_dnf::cnf_to_dnf::<Enc16>(
                 black_box(&cnf_dense),
                 black_box(n_vars),
-                OptimizedFor::AutoDetect
+                OptimizedFor::AutoDetect,
             )
         });
     });

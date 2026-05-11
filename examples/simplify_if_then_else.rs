@@ -1,6 +1,8 @@
 // Example: Simplify if-then-else conditions using Quine-McCluskey
 
-use qm_agent::simplify::{format_bool_expr, format_result, parse_bool_expr, simplify_branches, BoolExpr, BranchSet};
+use qm_agent::simplify::{
+    BoolExpr, BranchSet, format_bool_expr, format_result, parse_bool_expr, simplify_branches,
+};
 
 fn main() {
     println!("=== If-Then-Else Simplification Demo ===\n");
@@ -28,10 +30,7 @@ fn example_1() {
     println!();
 
     let mut branches = BranchSet::new();
-    branches.add_branch(
-        BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-        "1",
-    );
+    branches.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
     branches.add_branch(
         BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
         "1",
@@ -58,24 +57,12 @@ fn example_2() {
     let mut branches = BranchSet::new();
 
     // Branches returning 1
-    branches.add_branch(
-        parse_bool_expr("a && b && c").unwrap(),
-        "1",
-    );
-    branches.add_branch(
-        parse_bool_expr("a && b && !c").unwrap(),
-        "1",
-    );
+    branches.add_branch(parse_bool_expr("a && b && c").unwrap(), "1");
+    branches.add_branch(parse_bool_expr("a && b && !c").unwrap(), "1");
 
     // Branches returning 2
-    branches.add_branch(
-        parse_bool_expr("a && !b && c").unwrap(),
-        "2",
-    );
-    branches.add_branch(
-        parse_bool_expr("!a && b && c").unwrap(),
-        "2",
-    );
+    branches.add_branch(parse_bool_expr("a && !b && c").unwrap(), "2");
+    branches.add_branch(parse_bool_expr("!a && b && c").unwrap(), "2");
 
     branches.set_default("0");
 
@@ -97,14 +84,8 @@ fn example_3() {
     let mut branches = BranchSet::new();
 
     // Parse from string expressions
-    branches.add_branch(
-        parse_bool_expr("(a || b) && c").unwrap(),
-        "1",
-    );
-    branches.add_branch(
-        parse_bool_expr("a && b && !c").unwrap(),
-        "1",
-    );
+    branches.add_branch(parse_bool_expr("(a || b) && c").unwrap(), "1");
+    branches.add_branch(parse_bool_expr("a && b && !c").unwrap(), "1");
     branches.set_default("0");
 
     let result = simplify_branches(&branches).unwrap();

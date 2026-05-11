@@ -8,6 +8,11 @@ pub struct PetricksMethod<E: MintermEncoding> {
 }
 
 impl<E: MintermEncoding> PetricksMethod<E> {
+    /// Create a new Petrick's method solver.
+    ///
+    /// Takes the prime implicants found by the QM algorithm and the minterms
+    /// that must be covered. The solver will select a minimal subset of
+    /// prime implicants that covers all minterms.
     pub fn new(prime_implicants: &[Implicant<E>], minterms: &[E::Value]) -> Self {
         Self {
             prime_implicants: prime_implicants.to_vec(),
@@ -23,6 +28,14 @@ impl<E: MintermEncoding> PetricksMethod<E> {
             .unwrap_or(0)
     }
 
+    /// Find a minimal cover of prime implicants that covers all minterms.
+    ///
+    /// Uses SIMD acceleration when available (AVX-512 with ≥1024 checks) and
+    /// falls back to scalar greedy selection otherwise. The greedy approach
+    /// iterates through prime implicants in order, selecting each one that
+    /// covers at least one previously uncovered minterm.
+    ///
+    /// Returns an empty vector if no prime implicants are available.
     pub fn find_minimal_cover(&self) -> Vec<Implicant<E>> {
         if self.prime_implicants.is_empty() {
             return Vec::new();
@@ -43,7 +56,11 @@ impl<E: MintermEncoding> PetricksMethod<E> {
         self.find_minimal_cover_scalar()
     }
 
-    /// SIMD-accelerated minimal cover using pre-computed coverage matrix
+    /// SIMD-accelerated minimal cover using pre-computed coverage matrix.
+    ///
+    /// Builds a bit-packed coverage matrix using AVX-512 4-bit or 5-bit
+    /// operations, then performs greedy selection. Returns early once all
+    /// minterms are covered.
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     unsafe fn find_minimal_cover_simd(&self) -> Vec<Implicant<E>> {
         let num_bits = self.get_num_bits();
@@ -52,8 +69,14 @@ impl<E: MintermEncoding> PetricksMethod<E> {
         // Dispatch to appropriate bit-width implementation
         let coverage_matrix = unsafe {
             match num_bits {
-                0..=4 => simd_coverage::build_coverage_matrix_simd_4bit(&self.prime_implicants, &self.minterms),
-                5 => simd_coverage::build_coverage_matrix_simd_5bit(&self.prime_implicants, &self.minterms),
+                0..=4 => simd_coverage::build_coverage_matrix_simd_4bit(
+                    &self.prime_implicants,
+                    &self.minterms,
+                ),
+                5 => simd_coverage::build_coverage_matrix_simd_5bit(
+                    &self.prime_implicants,
+                    &self.minterms,
+                ),
                 _ => unreachable!("should_use_simd guards against >5 bits"),
             }
         };
@@ -115,6 +138,10 @@ impl<E: MintermEncoding> PetricksMethod<E> {
         selected
     }
 
+    /// Generate a product-of-sums expression from the prime implicant coverage.
+    ///
+    /// Currently returns a placeholder string. Full implementation would convert
+    /// the minimal cover into POS form using the dual of Petrick's method.
     pub fn generate_product_of_sums(&self) -> String {
         "Dummy POS expression".to_string()
     }

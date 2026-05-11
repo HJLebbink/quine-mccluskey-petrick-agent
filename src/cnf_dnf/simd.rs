@@ -72,7 +72,10 @@ unsafe fn optimized_for_avx512_epi8(result_dnf_next: &[u64], z: u64) -> (Vec<usi
 /// AVX512 optimized for 16-bit elements (32 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi16_internal(result_dnf_next: &[u16], z: u16) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi16_internal(
+    result_dnf_next: &[u16],
+    z: u16,
+) -> (Vec<usize>, bool) {
     const NB: usize = 5; // log2(32)
     let mut index_to_delete = Vec::with_capacity(32);
 
@@ -112,7 +115,10 @@ unsafe fn optimized_for_avx512_epi16_internal(result_dnf_next: &[u16], z: u16) -
 /// AVX512 optimized for 32-bit elements (16 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi32_internal(result_dnf_next: &[u32], z: u32) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi32_internal(
+    result_dnf_next: &[u32],
+    z: u32,
+) -> (Vec<usize>, bool) {
     const NB: usize = 4; // log2(16)
     let mut index_to_delete = Vec::with_capacity(16);
 
@@ -152,7 +158,10 @@ unsafe fn optimized_for_avx512_epi32_internal(result_dnf_next: &[u32], z: u32) -
 /// AVX512 optimized for 64-bit elements (8 elements per vector)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
-unsafe fn optimized_for_avx512_epi64_internal(result_dnf_next: &[u64], z: u64) -> (Vec<usize>, bool) {
+unsafe fn optimized_for_avx512_epi64_internal(
+    result_dnf_next: &[u64],
+    z: u64,
+) -> (Vec<usize>, bool) {
     const NB: usize = 3; // log2(8)
 
     let n = result_dnf_next.len();

@@ -1,6 +1,10 @@
 //! Implicant: Representation of implicants in the Quine-McCluskey algorithm
+//!
+//! Uses `SmallVec<[BitState; 64]>` so implicants for ≤64 variables stay inline
+//! on the stack with zero heap allocation, while still supporting arbitrary sizes.
 
 use super::encoding::{BitOps, MintermEncoding};
+use smallvec::smallvec;
 
 /// State of a bit in an implicant: Zero, One, or DontCare
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,23 +14,31 @@ pub enum BitState {
     DontCare,
 }
 
-/// An implicant in the Quine-McCluskey algorithm
+/// An implicant in the Quine-McCluskey algorithm.
+///
+/// An implicant represents a cube (a product term) in the Karnaugh map /
+/// Boolean expression.  Each bit corresponds to a variable and can be
+/// 0, 1, or DontCare (X).  The `covered_minterms` list is a cache used
+/// during the QM iteration to track which original minterms this cube
+/// covers, enabling O(1) combination checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Implicant<E: MintermEncoding> {
-    pub bits: Vec<BitState>,
+    /// Per-variable bit states. Inline capacity of 64 covers all encoding types.
+    pub bits: smallvec::SmallVec<[BitState; 64]>,
+    /// Set of original minterms covered by this implicant.
     pub covered_minterms: Vec<E::Value>,
 }
 
 impl<E: MintermEncoding> Implicant<E> {
+    /// Create from a single minterm (no dont-care bits).
     pub fn from_minterm(minterm: E::Value, variables: usize) -> Self {
-        let mut bits = Vec::with_capacity(variables);
-        // Iterate in reverse order to build MSB-first without needing reverse()
-        for i in (0..variables).rev() {
-            bits.push(if minterm.get_bit(i) {
+        let mut bits = smallvec![BitState::Zero; variables];
+        for i in 0..variables {
+            bits[i] = if minterm.get_bit(i) {
                 BitState::One
             } else {
                 BitState::Zero
-            });
+            };
         }
 
         Self {
@@ -35,50 +47,54 @@ impl<E: MintermEncoding> Implicant<E> {
         }
     }
 
+    /// Get a reference to the list of minterms covered by this implicant.
     #[inline]
     pub fn get_covered_minterms(&self) -> &[E::Value] {
         &self.covered_minterms
     }
 
+    /// Get the bit state at position `index` in the implicant.
+    ///
+    /// Returns `BitState::DontCare` if the index is beyond the bit vector.
     #[inline]
     pub fn get_bit(&self, index: usize) -> BitState {
         self.bits.get(index).copied().unwrap_or(BitState::DontCare)
     }
 
+    /// Check whether this implicant covers the given minterm.
+    ///
+    /// First checks the pre-computed `covered_minterms` list for speed,
+    /// then falls back to bit-level matching (used for DontCare expansion
+    /// from min-cubes).
     #[inline]
     pub fn covers_minterm(&self, minterm: E::Value) -> bool {
-        // Check against pre-computed list first for speed
         if self.covered_minterms.contains(&minterm) {
             return true;
         }
-        // Fall back to bit-level matching (needed for DontCare expansion from min-cubes)
         for (i, &state) in self.bits.iter().enumerate() {
-            if state == BitState::DontCare { continue; }
+            if state == BitState::DontCare {
+                continue;
+            }
             let expected = if state == BitState::One { 1u64 } else { 0u64 };
             let actual = (minterm.to_u64() >> i) & 1;
-            if actual != expected { return false; }
+            if actual != expected {
+                return false;
+            }
         }
         true
     }
 
-    /// Fast gray code check using raw encoding (like C++ is_gray_code)
-    /// Returns true if two raw encoded values differ by exactly 1 bit
-    /// This checks BOTH data and don't-care masks - they must be identical except for 1 data bit
     #[inline]
     pub fn is_gray_code(a: E::Value, b: E::Value) -> bool {
         (a ^ b).count_ones() == 1
     }
 
-    /// Fast combine using raw encoding (like C++ replace_complements)
-    /// Only called after is_gray_code returns true (don't-care masks are identical)
-    /// Preserves existing don't-cares and marks the differing bit as don't-care
     #[inline]
     pub fn replace_complements(a: E::Value, b: E::Value, variables: usize) -> E::Value {
         a | b | ((a ^ b) << variables)
     }
 
-    /// Convert to raw encoding: lower bits = data, upper bits = don't-care mask
-    /// This matches the C++ encoding for fast operations
+    /// Convert implicant to raw encoding for batch operations.
     pub fn to_raw_encoding(&self, variables: usize) -> E::Value {
         let mut data = E::Value::zero();
         let mut dont_care = E::Value::zero();
@@ -93,40 +109,87 @@ impl<E: MintermEncoding> Implicant<E> {
                     // data bit stays 0
                 }
                 BitState::DontCare => {
+                    data = data.set_bit(bit_pos); // set data bit to 1
                     dont_care = dont_care.set_bit(bit_pos);
                 }
             }
         }
 
-        // Combine: data in lower bits, don't-care mask in upper bits
+        // data in lower bits, don't-care mask in upper bits
         data | (dont_care << variables)
     }
 
-    /// Create from raw encoding (internal use only)
-    ///
-    /// WARNING: covered_minterms will be EMPTY and MUST be set by the caller!
-    /// This function is only used internally by the QM algorithm where
-    /// covered_minterms are tracked separately and set immediately after creation.
+    /// Create from raw encoding (internal use only).
     pub(crate) fn from_raw_encoding(raw: E::Value, variables: usize) -> Self {
         let mask = (E::Value::one() << variables) - E::Value::one();
         let data = raw & mask;
         let dont_care_mask = raw >> variables;
 
-        let mut bits = Vec::with_capacity(variables);
+        let mut bits = smallvec![BitState::DontCare; variables];
         for i in 0..variables {
-            let bit_pos = (variables - 1) - i; // MSB first
+            let bit_pos = (variables - 1) - i;
             if dont_care_mask.get_bit(bit_pos) {
-                bits.push(BitState::DontCare);
+                bits[i] = BitState::DontCare;
             } else if data.get_bit(bit_pos) {
-                bits.push(BitState::One);
+                bits[i] = BitState::One;
             } else {
-                bits.push(BitState::Zero);
+                bits[i] = BitState::Zero;
             }
         }
 
         Self {
             bits,
-            covered_minterms: Vec::new(),  // Empty - caller must set this!
+            covered_minterms: Vec::new(), // Empty - caller must set this!
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Enc16;
+    use crate::qm::encoding::Enc32;
+
+    #[test]
+    fn is_gray_code() {
+        // Minterm 0 (0000) and minterm 1 (0001) differ by exactly 1 bit → gray code pair
+        assert!(Implicant::<Enc32>::is_gray_code(0b00000000, 0b00000001));
+
+        // Minterm 0 and minterm 3 (0011) differ by 2 bits → not gray code
+        assert!(!Implicant::<Enc32>::is_gray_code(0b00000000, 0b00000011));
+
+        // Minterm 3 and minterm 7 (0111) differ by exactly 1 bit → gray code pair
+        assert!(Implicant::<Enc32>::is_gray_code(0b00000011, 0b00000111));
+
+        // Minterm 5 (0101) and minterm 7 differ by exactly 1 bit → gray code pair
+        assert!(Implicant::<Enc32>::is_gray_code(0b00000101, 0b00000111));
+
+        // Identical values → 0 differing bits, not a gray code pair
+        assert!(!Implicant::<Enc32>::is_gray_code(0, 0));
+
+        // Minterm 0 and minterm 128 differ by exactly 1 bit → gray code pair
+        assert!(Implicant::<Enc32>::is_gray_code(0, 1u64 << 7));
+    }
+
+    #[test]
+    fn replace_complements() {
+        {
+            let a = 0b0000_0000_0000_0000;
+            let b = 0b0000_0000_0000_0001;
+            let c = 0b0000_0001_0000_0001;
+            assert_eq!(Implicant::<Enc32>::replace_complements(a, b, 8), c);
+        }
+        {
+            let a = 0b0000_0000_0000_0000;
+            let b = 0b0000_0000_0000_0010;
+            let c = 0b0000_0010_0000_0010;
+            assert_eq!(Implicant::<Enc32>::replace_complements(a, b, 8), c);
+        }
+        {
+            let a = 0b0000_0000_0000_0001;
+            let b = 0b0000_0000_0000_0010;
+            let c = 0b0000_0011_0000_0011;
+            assert_eq!(Implicant::<Enc32>::replace_complements(a, b, 8), c);
         }
     }
 }

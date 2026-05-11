@@ -15,9 +15,9 @@ fn main() {
     // Example CNF: (A ∨ B) ∧ (A ∨ C) ∧ (B ∨ C)
     // Represented as bit vectors: A=bit0, B=bit1, C=bit2
     let cnf = vec![
-        0b011u64,  // A ∨ B
-        0b101u64,  // A ∨ C
-        0b110u64,  // B ∨ C
+        0b011u64, // A ∨ B
+        0b101u64, // A ∨ C
+        0b110u64, // B ∨ C
     ];
 
     println!("Input CNF: {}", cnf_dnf::cnf_to_string(&cnf));
@@ -58,30 +58,22 @@ fn main() {
     println!("Testing minimal DNF with explicit optimization:");
 
     let cnf_complex = vec![
-        0b1010u64,  // More complex CNF
-        0b1100u64,
-        0b0110u64,
+        0b1010u64, // More complex CNF
+        0b1100u64, 0b0110u64,
     ];
 
     println!("Input CNF: {}", cnf_dnf::cnf_to_string(&cnf_complex));
 
     // Test minimal DNF
-    let dnf_minimal_auto = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(
-        &cnf_complex,
-        4, OptimizedFor::AutoDetect
-    ).unwrap();
+    let dnf_minimal_auto =
+        cnf_dnf::cnf_to_dnf_minimal::<Enc64>(&cnf_complex, 4, OptimizedFor::AutoDetect).unwrap();
     println!("  Auto-detect minimal: {} terms", dnf_minimal_auto.len());
 
-    let dnf_minimal_x64 = cnf_dnf::cnf_to_dnf_minimal::<Enc64>(
-        &cnf_complex,
-        4, OptimizedFor::X64
-    ).unwrap();
+    let dnf_minimal_x64 =
+        cnf_dnf::cnf_to_dnf_minimal::<Enc64>(&cnf_complex, 4, OptimizedFor::X64).unwrap();
     println!("  X64 minimal: {} terms", dnf_minimal_x64.len());
 
-    assert_eq!(
-        dnf_minimal_auto, dnf_minimal_x64,
-        "Minimal DNF mismatch!"
-    );
+    assert_eq!(dnf_minimal_auto, dnf_minimal_x64, "Minimal DNF mismatch!");
     println!("  ✓ Minimal DNF results match\n");
 
     println!("All tests passed! ✓");

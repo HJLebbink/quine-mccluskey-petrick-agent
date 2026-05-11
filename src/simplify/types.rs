@@ -5,18 +5,18 @@ use std::collections::HashMap;
 /// A simple Boolean expression
 #[derive(Debug, Clone, PartialEq)]
 pub enum BoolExpr {
-    Var(String),                         // a, b, flag
-    Not(Box<BoolExpr>),                  // !a
-    And(Box<BoolExpr>, Box<BoolExpr>),   // a && b
-    Or(Box<BoolExpr>, Box<BoolExpr>),    // a || b
+    Var(String),                       // a, b, flag
+    Not(Box<BoolExpr>),                // !a
+    And(Box<BoolExpr>, Box<BoolExpr>), // a && b
+    Or(Box<BoolExpr>, Box<BoolExpr>),  // a || b
 
     // Comparison operators (for Phase 4)
-    Equals(String, i32),                 // x == 5
-    NotEquals(String, i32),              // x != 5
-    LessThan(String, i32),               // x < 5
-    LessOrEqual(String, i32),            // x <= 5
-    GreaterThan(String, i32),            // x > 5
-    GreaterOrEqual(String, i32),         // x >= 5
+    Equals(String, i32),         // x == 5
+    NotEquals(String, i32),      // x != 5
+    LessThan(String, i32),       // x < 5
+    LessOrEqual(String, i32),    // x <= 5
+    GreaterThan(String, i32),    // x > 5
+    GreaterOrEqual(String, i32), // x >= 5
 }
 
 impl BoolExpr {
@@ -66,7 +66,7 @@ impl BoolExpr {
 #[derive(Debug, Clone)]
 pub struct Branch {
     pub condition: BoolExpr,
-    pub output: String,  // For mini-MVP: just a string like "1" or "return true"
+    pub output: String, // For mini-MVP: just a string like "1" or "return true"
 }
 
 impl Branch {
@@ -81,8 +81,8 @@ impl Branch {
 /// Variable type with domain information
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableType {
-    Boolean,                    // True boolean variable
-    Integer { min: i32, max: i32 },  // Integer with bounded domain
+    Boolean,                        // True boolean variable
+    Integer { min: i32, max: i32 }, // Integer with bounded domain
 }
 
 impl VariableType {
@@ -119,7 +119,7 @@ impl VariableType {
 pub struct BranchSet {
     pub branches: Vec<Branch>,
     pub default_output: Option<String>,
-    pub variable_types: HashMap<String, VariableType>,  // Variable domains
+    pub variable_types: HashMap<String, VariableType>, // Variable domains
 }
 
 impl Default for BranchSet {
@@ -165,7 +165,7 @@ impl BranchSet {
 #[derive(Debug)]
 pub struct TruthTable {
     pub variables: Vec<String>,
-    pub output_groups: HashMap<String, Vec<u64>>,  // output -> list of minterms
+    pub output_groups: HashMap<String, Vec<u64>>, // output -> list of minterms
     pub dont_cares: Vec<u64>,
 }
 
@@ -187,7 +187,7 @@ impl TruthTable {
 #[derive(Debug)]
 pub struct SimplificationResult {
     pub variables: Vec<String>,
-    pub simplified_conditions: Vec<(BoolExpr, String)>,  // (condition, output)
+    pub simplified_conditions: Vec<(BoolExpr, String)>, // (condition, output)
     pub original_branch_count: usize,
     pub simplified_branch_count: usize,
     pub analysis: SimplificationAnalysis,
@@ -247,7 +247,7 @@ pub struct BranchCoverage {
     pub branch_index: usize,
     pub minterms_covered: Vec<u32>,
     pub coverage_count: usize,
-    pub overlaps_with: Vec<usize>,  // Indices of branches that overlap
+    pub overlaps_with: Vec<usize>, // Indices of branches that overlap
 }
 
 /// Information about unreachable dead code
@@ -255,12 +255,12 @@ pub struct BranchCoverage {
 pub struct DeadBranch {
     pub branch_index: usize,
     pub reason: DeadCodeReason,
-    pub covered_by: Vec<usize>,  // Which earlier branches make this unreachable
+    pub covered_by: Vec<usize>, // Which earlier branches make this unreachable
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DeadCodeReason {
-    FullyCovered,       // All conditions already handled by earlier branches
-    Contradiction,      // Condition is logically impossible
-    Redundant,         // Identical to an earlier branch
+    FullyCovered,  // All conditions already handled by earlier branches
+    Contradiction, // Condition is logically impossible
+    Redundant,     // Identical to an earlier branch
 }

@@ -1,9 +1,7 @@
-use criterion::{Criterion, criterion_group, criterion_main, BenchmarkId, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use qm_agent::qm::min_cubes::{
-    primes::PrimeCube, 
-    find_prime_implicants as mc_find_pis, 
-    covers,
-    SetCoverSolver, BnBSolver, LagrangianSolver, SCP_solver, solve_set_cover, get_solver,
+    BnBSolver, LagrangianSolver, SCP_solver, SetCoverSolver, covers,
+    find_prime_implicants as mc_find_pis, get_solver, primes::PrimeCube, solve_set_cover,
 };
 use std::hint::black_box;
 
@@ -31,7 +29,9 @@ fn gen_random(n: u8, seed: u64, density: f64) -> Vec<u64> {
     let mut rng = seed;
     (0..limit)
         .filter(|&i| {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (rng as f64 / u64::MAX as f64) < density
         })
         .collect()
@@ -54,20 +54,28 @@ fn get_pis_and_minterms(name: &str, n: u8, minterms: &[u64]) -> (Vec<PrimeCube>,
 
 fn bench_bnb(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_bnb");
-    
+
     let cases = [
         ("and3", gen_and(3), 3),
         ("or3", gen_or(3), 3),
         ("xor3", gen_xor(3), 3),
         ("xor4", gen_xor(4), 4),
-        ("maj5", gen_and(5).iter().cloned().chain((0..8).filter(|&i| i.count_ones() >= 3)).collect(), 5),
+        (
+            "maj5",
+            gen_and(5)
+                .iter()
+                .cloned()
+                .chain((0..8).filter(|&i| i.count_ones() >= 3))
+                .collect(),
+            5,
+        ),
         ("rand10", gen_random(10, 42, 0.5), 10),
         ("rand12", gen_random(12, 42, 0.3), 12),
     ];
-    
+
     for (name, minterms, n) in cases {
         let (pis, mts) = get_pis_and_minterms(name, n, &minterms);
-        
+
         group.throughput(Throughput::Elements(mts.len() as u64));
         group.bench_with_input(
             BenchmarkId::new("bnb", name),
@@ -81,7 +89,7 @@ fn bench_bnb(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -91,7 +99,7 @@ fn bench_bnb(c: &mut Criterion) {
 
 fn bench_lagrangian(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_lagrangian");
-    
+
     let cases = [
         ("and3", gen_and(3), 3),
         ("xor3", gen_xor(3), 3),
@@ -99,10 +107,10 @@ fn bench_lagrangian(c: &mut Criterion) {
         ("rand10", gen_random(10, 42, 0.5), 10),
         ("rand12", gen_random(12, 42, 0.3), 12),
     ];
-    
+
     for (name, minterms, n) in cases {
         let (pis, mts) = get_pis_and_minterms(name, n, &minterms);
-        
+
         group.bench_with_input(
             BenchmarkId::new("lagrangian", name),
             &(pis, mts),
@@ -115,7 +123,7 @@ fn bench_lagrangian(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -125,16 +133,16 @@ fn bench_lagrangian(c: &mut Criterion) {
 
 fn bench_scp(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_scp");
-    
+
     let cases = [
         ("and3", gen_and(3), 3),
         ("xor3", gen_xor(3), 3),
         ("xor4", gen_xor(4), 4),
     ];
-    
+
     for (name, minterms, n) in cases {
         let (pis, mts) = get_pis_and_minterms(name, n, &minterms);
-        
+
         group.bench_with_input(
             BenchmarkId::new("scp", name),
             &(pis, mts),
@@ -147,7 +155,7 @@ fn bench_scp(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -157,21 +165,21 @@ fn bench_scp(c: &mut Criterion) {
 
 fn bench_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_comparison");
-    
+
     let cases = [
         ("and3", gen_and(3), 3),
         ("xor3", gen_xor(3), 3),
         ("xor4", gen_xor(4), 4),
         ("rand10", gen_random(10, 42, 0.5), 10),
     ];
-    
+
     for (name, minterms, n) in cases {
         let (pis, mts) = get_pis_and_minterms(name, n, &minterms);
-        
+
         // Test each solver
         for solver_type in &["bnb", "lagrangian", "scp"] {
             let solver = get_solver(solver_type);
-            
+
             group.bench_with_input(
                 BenchmarkId::new(name, solver.name()),
                 &(pis, mts),
@@ -185,7 +193,7 @@ fn bench_comparison(c: &mut Criterion) {
             );
         }
     }
-    
+
     group.finish();
 }
 

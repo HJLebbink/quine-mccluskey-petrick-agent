@@ -8,11 +8,14 @@ use super::encoding::{BitOps, MintermEncoding};
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 use super::implicant::{BitState, Implicant};
 
-/// Bit-packed coverage matrix for memory-efficient storage
+/// Bit-packed coverage matrix for memory-efficient storage.
 ///
 /// Stores coverage as packed bits (8 bits per byte) in row-major order.
-/// This is 8× more memory efficient than Vec<Vec<bool>> and allows direct
-/// storage of SIMD output without unpacking.
+/// This is 8× more memory efficient than `Vec<Vec<bool>>` and allows
+/// direct storage of SIMD output without unpacking.
+///
+/// Row `i` corresponds to prime implicant `i`, column `j` to minterm `j`.
+/// `matrix.get(i, j)` returns `true` if PI `i` covers minterm `j`.
 #[derive(Debug, Clone)]
 pub struct CoverageMatrix {
     /// Bit-packed data: data[row * row_bytes + col/8] contains bit for (row, col)
@@ -38,7 +41,10 @@ impl CoverageMatrix {
         }
     }
 
-    /// Get the coverage value at (row, col)
+    /// Get the coverage value at `(row, col)`.
+    ///
+    /// Row corresponds to a prime implicant, column to a minterm.
+    /// Returns `true` if the prime implicant covers the given minterm.
     #[inline]
     pub fn get(&self, row: usize, col: usize) -> bool {
         debug_assert!(row < self.num_rows);
@@ -62,19 +68,19 @@ impl CoverageMatrix {
         }
     }
 
-    /// Get the number of rows
+    /// Get the number of rows (prime implicants) in the coverage matrix.
     #[inline]
     pub fn num_rows(&self) -> usize {
         self.num_rows
     }
 
-    /// Get the number of columns
+    /// Get the number of columns (minterms) in the coverage matrix.
     #[inline]
     pub fn num_cols(&self) -> usize {
         self.num_cols
     }
 
-    /// Get mutable access to a row's raw bytes (for direct SIMD output)
+    /// Get mutable access to a row's raw bytes for direct SIMD output writes.
     #[inline]
     pub fn row_bytes_mut(&mut self, row: usize) -> &mut [u8] {
         debug_assert!(row < self.num_rows);
@@ -101,7 +107,11 @@ impl CoverageMatrix {
             let num_bytes = ((num_cols - col_offset).min(512) + 7) / 8;
             let num_bits = num_cols - col_offset;
             let row_bytes = self.row_bytes_mut(row);
-            transpose_striped_to_consecutive(striped, &mut row_bytes[start_byte..start_byte + num_bytes], num_bits);
+            transpose_striped_to_consecutive(
+                striped,
+                &mut row_bytes[start_byte..start_byte + num_bytes],
+                num_bits,
+            );
         } else {
             // Slow path: unaligned write (rare, only for partial batches)
             for i in 0..512.min(num_cols - col_offset) {
@@ -174,7 +184,13 @@ fn transpose_striped_to_consecutive(striped: &[u8; 64], output: &mut [u8], num_b
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 const SIMD_THRESHOLD: usize = 1024;
 
-/// Check if SIMD acceleration is available and worthwhile
+/// Check if SIMD acceleration is available and worthwhile for the given problem size.
+///
+/// SIMD is enabled when:
+/// - Running on x86_64 with the "simd" feature flag enabled
+/// - CPU supports AVX-512F and GFNI instructions
+/// - Number of coverage checks >= 1024 (threshold to amortize overhead)
+/// - Number of bits is 1-5 (supports 4-bit and 5-bit encoding)
 pub fn should_use_simd(num_checks: usize, num_bits: usize) -> bool {
     // Supports 4-bit and 5-bit
     if num_bits > 5 || num_bits < 1 {
@@ -195,12 +211,17 @@ pub fn should_use_simd(num_checks: usize, num_bits: usize) -> bool {
     }
 }
 
-/// Build coverage matrix using SIMD acceleration
+/// Build coverage matrix using AVX-512 with bit-transposed 4-bit encoding.
 ///
 /// For each prime implicant, checks which minterms it covers by processing
-/// 512 minterms at a time using AVX-512.
+/// 512 minterms at a time using GFNI bit-plane operations.
 ///
-/// Returns: CoverageMatrix with bit-packed storage where [i][j] = true if prime_implicant[i] covers minterm[j]
+/// The coverage matrix uses bit-packed storage (8 bits per byte) for memory
+/// efficiency and direct SIMD output storage without unpacking.
+///
+/// # Safety
+/// Requires AVX-512F and GFNI CPU features. The caller must ensure
+/// `should_use_simd()` returned true before calling.
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub unsafe fn build_coverage_matrix_simd_4bit<E: MintermEncoding>(
     prime_implicants: &[Implicant<E>],
@@ -213,10 +234,7 @@ pub unsafe fn build_coverage_matrix_simd_4bit<E: MintermEncoding>(
     let mut coverage_matrix = CoverageMatrix::new(num_pi, num_mt);
 
     // Convert minterms to u8
-    let minterms_u8: Vec<u8> = minterms
-        .iter()
-        .map(|&mt| mt.to_u64() as u8)
-        .collect();
+    let minterms_u8: Vec<u8> = minterms.iter().map(|&mt| mt.to_u64() as u8).collect();
 
     // Process minterms in batches of 512
     let num_batches = (num_mt + 511) / 512;
@@ -246,7 +264,8 @@ pub unsafe fn build_coverage_matrix_simd_4bit<E: MintermEncoding>(
 
             // Store results directly to coverage matrix (optimized bulk write)
             // Convert from striped layout to consecutive and write directly
-            let coverage_array: [u8; 64] = coverage_bits.try_into().expect("Vec should be 64 bytes");
+            let coverage_array: [u8; 64] =
+                coverage_bits.try_into().expect("Vec should be 64 bytes");
             coverage_matrix.write_striped_bits(pi_idx, offset, &coverage_array);
         }
     }
@@ -283,8 +302,7 @@ unsafe fn check_coverage_batch_4bit(
             implicant_regs[reg] =
                 _mm512_loadu_si512(implicant_bytes[reg * 64..].as_ptr() as *const __m512i);
             mask_regs[reg] = _mm512_loadu_si512(mask_bytes[reg * 64..].as_ptr() as *const __m512i);
-            minterm_regs[reg] =
-                _mm512_loadu_si512(minterms[reg * 64..].as_ptr() as *const __m512i);
+            minterm_regs[reg] = _mm512_loadu_si512(minterms[reg * 64..].as_ptr() as *const __m512i);
         }
 
         // Separate into bit planes (only first 4 used for 4-bit values)
@@ -314,12 +332,16 @@ unsafe fn check_coverage_batch_4bit(
     }
 }
 
-/// Build coverage matrix using SIMD acceleration (5-bit version)
+/// Build coverage matrix using AVX-512 with bit-transposed 5-bit encoding.
 ///
 /// For each prime implicant, checks which minterms it covers by processing
-/// 512 minterms at a time using AVX-512.
+/// 512 minterms at a time using GFNI bit-plane operations.
 ///
-/// Returns: CoverageMatrix with bit-packed storage where [i][j] = true if prime_implicant[i] covers minterm[j]
+/// Uses 8-to-8 bit-plane extraction but only operates on the first 5 planes.
+///
+/// # Safety
+/// Requires AVX-512F and GFNI CPU features. The caller must ensure
+/// `should_use_simd()` returned true before calling.
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub unsafe fn build_coverage_matrix_simd_5bit<E: MintermEncoding>(
     prime_implicants: &[Implicant<E>],
@@ -332,10 +354,7 @@ pub unsafe fn build_coverage_matrix_simd_5bit<E: MintermEncoding>(
     let mut coverage_matrix = CoverageMatrix::new(num_pi, num_mt);
 
     // Convert minterms to u8
-    let minterms_u8: Vec<u8> = minterms
-        .iter()
-        .map(|&mt| mt.to_u64() as u8)
-        .collect();
+    let minterms_u8: Vec<u8> = minterms.iter().map(|&mt| mt.to_u64() as u8).collect();
 
     // Process minterms in batches of 512
     let num_batches = (num_mt + 511) / 512;
@@ -365,7 +384,8 @@ pub unsafe fn build_coverage_matrix_simd_5bit<E: MintermEncoding>(
 
             // Store results directly to coverage matrix (optimized bulk write)
             // Convert from striped layout to consecutive and write directly
-            let coverage_array: [u8; 64] = coverage_bits.try_into().expect("Vec should be 64 bytes");
+            let coverage_array: [u8; 64] =
+                coverage_bits.try_into().expect("Vec should be 64 bytes");
             coverage_matrix.write_striped_bits(pi_idx, offset, &coverage_array);
         }
     }
@@ -402,8 +422,7 @@ unsafe fn check_coverage_batch_5bit(
             implicant_regs[reg] =
                 _mm512_loadu_si512(implicant_bytes[reg * 64..].as_ptr() as *const __m512i);
             mask_regs[reg] = _mm512_loadu_si512(mask_bytes[reg * 64..].as_ptr() as *const __m512i);
-            minterm_regs[reg] =
-                _mm512_loadu_si512(minterms[reg * 64..].as_ptr() as *const __m512i);
+            minterm_regs[reg] = _mm512_loadu_si512(minterms[reg * 64..].as_ptr() as *const __m512i);
         }
 
         // Separate into bit planes (use 8to8 and take first 5 planes)
@@ -442,11 +461,13 @@ unsafe fn check_coverage_batch_5bit(
     }
 }
 
-/// Extract implicant representation for coverage checking
+/// Extract the implicant's value and don't-care mask for coverage checking.
 ///
-/// Returns: (implicant_value, dont_care_mask)
-/// - implicant_value: The fixed bit values (0s and 1s)
-/// - dont_care_mask: 1 = don't care, 0 = must match
+/// Returns:
+/// - `value`: Fixed bit positions set to 1 (BitState::One)
+/// - `mask`: Don't-care bit positions (BitState::DontCare)
+///
+/// BitState::Zero contributes nothing to either output.
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 fn extract_implicant_representation<E: MintermEncoding>(implicant: &Implicant<E>) -> (u8, u8) {
     let mut value = 0u8;
@@ -459,7 +480,7 @@ fn extract_implicant_representation<E: MintermEncoding>(implicant: &Implicant<E>
             }
             BitState::One => {
                 value |= 1 << i; // Set bit in value
-                                 // mask bit stays 0 (must match)
+                // mask bit stays 0 (must match)
             }
             BitState::DontCare => {
                 mask |= 1 << i; // Set bit in mask (don't care)
@@ -478,14 +499,14 @@ mod tests {
     #[test]
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     fn test_extract_implicant_representation() {
-        // Test implicant: 0X1X
         let mut pi = Implicant::<Enc16>::from_minterm(0, 4);
-        pi.bits = vec![
-            BitState::Zero,     // bit 0: must be 0
-            BitState::DontCare, // bit 1: don't care
-            BitState::One,      // bit 2: must be 1
-            BitState::DontCare, // bit 3: don't care
-        ];
+        pi.bits.clear();
+        pi.bits.extend([
+            BitState::Zero,
+            BitState::DontCare,
+            BitState::One,
+            BitState::DontCare,
+        ]);
 
         let (value, mask) = extract_implicant_representation(&pi);
 
@@ -503,11 +524,17 @@ mod tests {
 
         // Large 4-bit problem: might use SIMD (if hardware supports it)
         let should_use_4bit = should_use_simd(10000, 4);
-        println!("SIMD available for large 4-bit problem: {}", should_use_4bit);
+        println!(
+            "SIMD available for large 4-bit problem: {}",
+            should_use_4bit
+        );
 
         // Large 5-bit problem: might use SIMD (if hardware supports it)
         let should_use_5bit = should_use_simd(10000, 5);
-        println!("SIMD available for large 5-bit problem: {}", should_use_5bit);
+        println!(
+            "SIMD available for large 5-bit problem: {}",
+            should_use_5bit
+        );
 
         // 6-bit problem: not supported
         assert!(!should_use_simd(10000, 6));

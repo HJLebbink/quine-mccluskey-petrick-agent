@@ -6,10 +6,13 @@
 use std::fmt;
 use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr, Sub};
 
-use crate::cnf_dnf::OptimizedFor;
 use super::gray_code;
+use crate::cnf_dnf::OptimizedFor;
 
-/// Trait for integer types that can be used in bit operations
+/// Trait for integer types that can be used in bit operations.
+///
+/// Implemented for u32 (Encoding16), u64 (Encoding32), and u128 (Encoding64).
+/// Provides low-level bitwise operations needed for minterm manipulations.
 pub trait BitOps:
     Copy
     + Eq
@@ -143,30 +146,43 @@ impl BitOps for u128 {
     }
 }
 
-/// Trait defining the encoding scheme for minterms
+/// Trait defining the encoding scheme for minterms in the QM algorithm.
+///
+/// Three implementations exist:
+/// - `Enc16`: uses u32 values, supports up to 16 variables
+/// - `Enc32`: uses u64 values, supports up to 32 variables
+/// - `Enc64`: uses u128 values, supports up to 64 variables
+///
+/// The generic type parameters control the value width, which affects
+/// SIMD data parallelism (more values = more parallelism per vector).
 pub trait MintermEncoding: Copy + fmt::Debug {
-    /// The integer type used for storing minterms
+    /// The integer type used for storing minterms and implicant data.
     type Value: BitOps;
 
-    /// Offset for don't-care bits (16 for 16-bit mode, 32 for 32-bit mode, 64 for 64-bit mode)
+    /// Bit offset for don't-care bits in the raw encoding layout.
+    /// Data bits occupy `0..DK_OFFSET`, don't-care mask occupies `DK_OFFSET..`
     const DK_OFFSET: usize;
 
-    /// Maximum number of variables supported
+    /// Maximum number of Boolean variables this encoding supports.
     const MAX_VARS: usize;
 
-    /// Width of the MintermSet bucket array
+    /// Width of the MintermSet bucket array (max_bit_count + 1).
     const BUCKET_WIDTH: usize;
 
-    /// Get the recommended OptimizedFor variant for this encoding
+    /// Get the recommended SIMD optimization strategy for this encoding width.
     fn recommended_optimized_for() -> OptimizedFor;
 
-    /// Check if an OptimizedFor variant is compatible with this encoding
-    /// Returns true if the OptimizedFor can handle the encoding's MAX_VARS
+    /// Check if an OptimizedFor variant is compatible with this encoding's variable limit.
+    /// Returns true if the variant can handle the encoding's `MAX_VARS`.
     fn is_compatible_with(of: OptimizedFor) -> bool {
         of.max_bits() >= Self::MAX_VARS
     }
 
-    /// Find gray code pairs using SIMD-optimized implementation
+    /// Find all Hamming-distance-1 pairs between two groups of implicants.
+    ///
+    /// Given indices into `raw_encodings` for group1 and group2, returns pairs
+    /// `(i, j)` where the two implicants differ by exactly one bit. The actual
+    /// implementation depends on the encoding type (typically fxhash-based lookup).
     fn find_gray_code_pairs(
         group1_indices: &[usize],
         group2_indices: &[usize],
@@ -174,7 +190,11 @@ pub trait MintermEncoding: Copy + fmt::Debug {
     ) -> Vec<(usize, usize)>;
 }
 
-/// 16-bit encoding: uses u32, supports up to 16 variables
+/// 16-bit encoding: uses u32 values, supports up to 16 variables.
+///
+/// The `DK_OFFSET` is 16, meaning data bits occupy positions 0-15
+/// and don't-care mask occupies positions 16-31 in the raw encoding.
+/// Recommended SIMD optimization: `Avx512_16bits`.
 #[derive(Debug, Copy, Clone)]
 pub struct Enc16;
 
@@ -198,7 +218,11 @@ impl MintermEncoding for Enc16 {
     }
 }
 
-/// 32-bit encoding: uses u64, supports up to 32 variables
+/// 32-bit encoding: uses u64 values, supports up to 32 variables.
+///
+/// The `DK_OFFSET` is 32, meaning data bits occupy positions 0-31
+/// and don't-care mask occupies positions 32-63 in the raw encoding.
+/// Recommended SIMD optimization: `Avx512_32bits`.
 #[derive(Debug, Copy, Clone)]
 pub struct Enc32;
 
@@ -222,7 +246,11 @@ impl MintermEncoding for Enc32 {
     }
 }
 
-/// 64-bit encoding: uses u128, supports up to 64 variables
+/// 64-bit encoding: uses u128 values, supports up to 64 variables.
+///
+/// The `DK_OFFSET` is 64, meaning data bits occupy positions 0-63
+/// and don't-care mask occupies positions 64-127 in the raw encoding.
+/// Recommended SIMD optimization: `Avx512_64bits`.
 #[derive(Debug, Copy, Clone)]
 pub struct Enc64;
 

@@ -6,13 +6,17 @@ use super::implicant::Implicant;
 /// Core Quine-McCluskey algorithm implementation
 pub struct QuineMcCluskey<E: MintermEncoding> {
     variables: usize,
-    mask: E::Value,  // Cached mask for extracting data bits
+    mask: E::Value, // Cached mask for extracting data bits
     minterms: Vec<E::Value>,
     dont_cares: Vec<E::Value>,
     solution_steps: Vec<String>,
 }
 
 impl<E: MintermEncoding> QuineMcCluskey<E> {
+    /// Create a new Quine-McCluskey solver with the given number of variables.
+    ///
+    /// The mask for extracting data bits from minterms is computed as
+    /// `(1 << variables) - 1` to support the encoding type's value width.
     pub fn new(variables: usize) -> Self {
         let mask = (E::Value::one() << variables) - E::Value::one();
         Self {
@@ -24,30 +28,55 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
         }
     }
 
+    /// Set the minterms that must be covered by the prime implicants.
+    ///
+    /// Any previous minterms are replaced by this new set.
     pub fn set_minterms(&mut self, minterms: Vec<E::Value>) {
         self.minterms = minterms;
     }
 
+    /// Set the don't-care minterms that may be covered but are not required.
+    ///
+    /// Don't-cares help the algorithm find larger prime implicants by allowing
+    /// more combinations, but they do not need to be covered in the final solution.
     pub fn set_dont_cares(&mut self, dont_cares: Vec<E::Value>) {
         self.dont_cares = dont_cares;
     }
 
+    /// Find all prime implicants using Hamming-distance-1 iterative merging.
+    ///
+    /// Groups implicants by Hamming weight and compares adjacent groups to find
+    /// pairs that differ by exactly one bit, combining them into larger implicants.
+    /// Repeats until no more combinations are possible.
+    ///
+    /// Clears the solution steps before starting and logs each processing level.
     pub fn find_prime_implicants(&mut self) -> Vec<Implicant<E>> {
         self.solution_steps.clear();
-        self.solution_steps.push(format!("Step 1: Initial minterms: {} terms", self.minterms.len()));
+        self.solution_steps.push(format!(
+            "Step 1: Initial minterms: {} terms",
+            self.minterms.len()
+        ));
 
         let mut all_terms = self.minterms.clone();
         all_terms.extend(&self.dont_cares);
 
-        let mut current_level: Vec<Implicant<E>> = all_terms.iter()
+        let mut current_level: Vec<Implicant<E>> = all_terms
+            .iter()
             .map(|&term| Implicant::from_minterm(term, self.variables))
             .collect();
+
+        //#[cfg(debug_assertions)]
+        //validate_prime_implicants(&current_level, self.variables);
 
         let mut prime_implicants = Vec::new();
         let mut level = 1;
 
         while !current_level.is_empty() {
-            let msg = format!("Step {}: Processing {} implicants", level + 1, current_level.len());
+            let msg = format!(
+                "Step {}: Processing {} implicants",
+                level + 1,
+                current_level.len()
+            );
             println!("{}", msg);
             self.solution_steps.push(msg);
 
@@ -61,7 +90,8 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
 
             // Convert all implicants to raw encoding for fast operations
-            let raw_encodings: Vec<E::Value> = current_level.iter()
+            let raw_encodings: Vec<E::Value> = current_level
+                .iter()
                 .map(|imp| imp.to_raw_encoding(self.variables))
                 .collect();
 
@@ -79,20 +109,27 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             // Only compare adjacent Hamming weight groups
             let max_weight = groups.keys().max().copied().unwrap_or(0);
             for weight in 0..max_weight {
-                if let (Some(group1), Some(group2)) = (groups.get(&weight), groups.get(&(weight + 1))) {
+                if let (Some(group1), Some(group2)) =
+                    (groups.get(&weight), groups.get(&(weight + 1)))
+                {
                     // Use SIMD-optimized gray code pair finding
                     let pairs = E::find_gray_code_pairs(group1, group2, &raw_encodings);
 
-                    println!("number of pairs found between weight {} and {}: {}", weight, weight + 1, pairs.len());
-                    
-                    
+                    println!(
+                        "number of pairs found between weight {} and {}: {}",
+                        weight,
+                        weight + 1,
+                        pairs.len()
+                    );
+
                     for (i, j) in pairs {
                         used[i] = true;
                         used[j] = true;
 
                         let raw_i = raw_encodings[i];
                         let raw_j = raw_encodings[j];
-                        let raw_combined = Implicant::<E>::replace_complements(raw_i, raw_j, self.variables);
+                        let raw_combined =
+                            Implicant::<E>::replace_complements(raw_i, raw_j, self.variables);
 
                         let entry = next_level_map.entry(raw_combined).or_insert_with(Vec::new);
                         entry.extend(&current_level[i].covered_minterms);
@@ -109,11 +146,21 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
                 let mut combined_imp = Implicant::<E>::from_raw_encoding(raw_value, self.variables);
                 combined_imp.covered_minterms = covered;
 
+                //#[cfg(debug_assertions)]
+                //validate_prime_implicant(&combined_imp, self.variables);
+
                 next_level.push(combined_imp);
             }
 
-            println!("Level {}: next_level size = {}, prime_implicants so far = {}",
-                     level, next_level.len(), prime_implicants.len());
+            println!(
+                "Level {}: next_level size = {}, prime_implicants so far = {}",
+                level,
+                next_level.len(),
+                prime_implicants.len()
+            );
+
+            //#[cfg(debug_assertions)]
+            //validate_prime_implicants(&next_level, self.variables);
 
             for (i, implicant) in current_level.into_iter().enumerate() {
                 if !used[i] {
@@ -125,7 +172,12 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             level += 1;
         }
 
-        self.solution_steps.push(format!("Found {} prime implicants", prime_implicants.len()));
+        self.solution_steps
+            .push(format!("Found {} prime implicants", prime_implicants.len()));
+
+        //#[cfg(debug_assertions)]
+        //validate_prime_implicants(&prime_implicants, self.variables);
+
         prime_implicants
     }
 
@@ -157,7 +209,8 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             }
         }
 
-        let essential_pis: Vec<Implicant<E>> = all_pis.iter()
+        let essential_pis: Vec<Implicant<E>> = all_pis
+            .iter()
             .enumerate()
             .filter_map(|(idx, pi)| {
                 if essential_indices.contains(&idx) {
@@ -170,13 +223,70 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
         self.solution_steps.push(format!(
             "Step {}: Identified {} essential prime implicants (uniquely covering minterms)",
-            self.solution_steps.len() + 1, essential_pis.len()
+            self.solution_steps.len() + 1,
+            essential_pis.len()
         ));
 
         essential_pis
     }
 
+    /// Get the step-by-step description of the minimization process.
+    ///
+    /// Returns the sequence of operations performed during the last
+    /// `find_prime_implicants()` call, including initial minterms,
+    /// processing levels, and final count.
     pub fn get_solution_steps(&self) -> &[String] {
         &self.solution_steps
+    }
+}
+
+/// Validate a list of prime implicants for correctness.
+///
+/// 1. **Duplicates** — two implicants with the same raw encoding should not appear.
+/// 2. **Don't-care consistency** — every entry in `covered_minterms` must have
+///    0 in every bit position that is marked as DontCare in the implicant.
+///
+/// Prints warnings and triggers an `int 3` breakpoint if anything is wrong.
+/// Only active in debug builds via `#[cfg(debug_assertions)]` guards on callers.
+#[allow(dead_code)]
+pub fn validate_prime_implicants<E: MintermEncoding>(
+    implicants: &[Implicant<E>],
+    variables: usize,
+) {
+    let mut seen = std::collections::HashMap::new();
+    for (idx, pi) in implicants.iter().enumerate() {
+        let raw = pi.to_raw_encoding(variables);
+        if let Some(first) = seen.insert(raw, idx) {
+            println!(
+                "validate_prime_implicants: duplicate PI {} at index {} matches first at index {}",
+                idx, idx, first
+            );
+            unsafe {
+                std::arch::asm!("int 3");
+            }
+            break;
+        }
+    }
+
+    for (_, pi) in implicants.iter().enumerate() {
+        validate_prime_implicant::<E>(pi, variables);
+    }
+}
+
+pub fn validate_prime_implicant<E: MintermEncoding>(pi: &Implicant<E>, variables: usize) {
+    let raw: E::Value = pi.to_raw_encoding(variables);
+    for i in 0..variables {
+        let dont_know = raw.get_bit(i + E::MAX_VARS);
+        let data_bit = raw.get_bit(i);
+
+        if dont_know && !data_bit {
+            println!(
+                "validate_prime_implicants: DontCare bit is set while data bit is cleared. {:032b}",
+                raw.to_u64()
+            );
+            unsafe {
+                std::arch::asm!("int 3");
+            }
+        }
     }
 }

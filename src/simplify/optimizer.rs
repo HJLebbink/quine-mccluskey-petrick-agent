@@ -1,8 +1,8 @@
 // Optimizer: Apply QM minimization and generate simplified conditions
 
-use crate::{Enc16, Enc32, Enc64};
 use super::types::{BoolExpr, BranchSet, SimplificationResult, TruthTable};
 use crate::qm::QMSolver;
+use crate::{Enc16, Enc32, Enc64};
 
 /// Simplify a set of branches using Quine-McCluskey minimization
 pub fn simplify_branches(branch_set: &BranchSet) -> Result<SimplificationResult, String> {
@@ -232,9 +232,10 @@ fn parse_and_term(term: &str, variables: &[String]) -> Result<BoolExpr, String> 
             // Find the longest matching variable name
             for var in variables {
                 if remaining.starts_with(var.as_str())
-                    && (matched_var.is_none() || var.len() > matched_var.as_ref().unwrap().len()) {
-                        matched_var = Some(var.clone());
-                    }
+                    && (matched_var.is_none() || var.len() > matched_var.as_ref().unwrap().len())
+                {
+                    matched_var = Some(var.clone());
+                }
             }
 
             let var_name = if let Some(var) = matched_var {
@@ -327,10 +328,7 @@ mod tests {
         // else { return "0" }
         // Should simplify to a simpler condition
         let mut branch_set = BranchSet::new();
-        branch_set.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branch_set.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         branch_set.add_branch(
             BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",
@@ -362,10 +360,7 @@ mod tests {
         let vars = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 
         let expr = parse_and_term("ab", &vars).unwrap();
-        assert_eq!(
-            expr,
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b"))
-        );
+        assert_eq!(expr, BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")));
 
         let expr2 = parse_and_term("a'b", &vars).unwrap();
         assert_eq!(

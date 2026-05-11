@@ -1,12 +1,9 @@
 // Test consistency between reference (HashMap) and optimized (FxHash) implementations
 // using random data to ensure both produce identical results
 
-use qm_agent::qm::gray_code::{
-    find_gray_code_pairs_ref,
-    find_gray_code_pairs_fxhash,
-};
-use rand::{Rng, SeedableRng};
+use qm_agent::qm::gray_code::{find_gray_code_pairs_fxhash, find_gray_code_pairs_ref};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::collections::HashSet;
 
 /// Generate random u32 values with approximately k bits set
@@ -94,15 +91,20 @@ fn test_consistency_u32_small() {
     let group2_indices: Vec<usize> = (50..100).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     // Both now return (i, j) indices, so we can compare directly
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
 
-    assert_eq!(set_ref.len(), set_fxhash.len(),
-               "Different number of pairs: ref={}, fxhash={}",
-               pairs_ref.len(), pairs_fxhash.len());
+    assert_eq!(
+        set_ref.len(),
+        set_fxhash.len(),
+        "Different number of pairs: ref={}, fxhash={}",
+        pairs_ref.len(),
+        pairs_fxhash.len()
+    );
 
     assert_eq!(set_ref, set_fxhash, "Pairs don't match");
 }
@@ -121,7 +123,8 @@ fn test_consistency_u32_medium() {
     let group2_indices: Vec<usize> = (200..400).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -143,7 +146,8 @@ fn test_consistency_u32_large() {
     let group2_indices: Vec<usize> = (1000..2000).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -166,7 +170,8 @@ fn test_consistency_u64() {
     let group2_indices: Vec<usize> = (100..200).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -188,7 +193,8 @@ fn test_consistency_u128() {
     let group2_indices: Vec<usize> = (100..200).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -210,7 +216,8 @@ fn test_consistency_sparse_data() {
     let group2_indices: Vec<usize> = (150..300).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -232,7 +239,8 @@ fn test_consistency_dense_data() {
     let group2_indices: Vec<usize> = (150..300).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -247,7 +255,8 @@ fn test_consistency_empty_groups() {
     let group2_indices: Vec<usize> = vec![0, 1, 2];
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     assert_eq!(pairs_ref.len(), pairs_fxhash.len());
     assert_eq!(pairs_ref.len(), 0, "Empty group1 should produce no pairs");
@@ -257,17 +266,18 @@ fn test_consistency_empty_groups() {
 fn test_consistency_no_matches() {
     // Group1 and group2 have no gray code pairs
     let raw_encodings: Vec<u32> = vec![
-        0b0000_0011,  // 2 bits set
-        0b0000_0101,  // 2 bits set
-        0b1111_0000,  // 4 bits set (far from group1)
-        0b1111_1100,  // 6 bits set (far from group1)
+        0b0000_0011, // 2 bits set
+        0b0000_0101, // 2 bits set
+        0b1111_0000, // 4 bits set (far from group1)
+        0b1111_1100, // 6 bits set (far from group1)
     ];
 
     let group1_indices = vec![0, 1];
     let group2_indices = vec![2, 3];
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     assert_eq!(pairs_ref.len(), pairs_fxhash.len());
     assert_eq!(pairs_ref.len(), 0, "No gray code pairs should exist");
@@ -277,23 +287,27 @@ fn test_consistency_no_matches() {
 fn test_consistency_all_match() {
     // Every element in group1 matches with some in group2
     let raw_encodings: Vec<u32> = vec![
-        0b0000_0001,  // 1 bit
-        0b0000_0010,  // 1 bit
-        0b0000_0011,  // 2 bits - differs from [0] by bit 1, from [1] by bit 0
-        0b0000_0110,  // 2 bits - differs from [1] by bit 2
+        0b0000_0001, // 1 bit
+        0b0000_0010, // 1 bit
+        0b0000_0011, // 2 bits - differs from [0] by bit 1, from [1] by bit 0
+        0b0000_0110, // 2 bits - differs from [1] by bit 2
     ];
 
     let group1_indices = vec![0, 1];
     let group2_indices = vec![2, 3];
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);
 
     assert_eq!(set_ref, set_fxhash);
-    assert!(pairs_ref.len() >= 2, "Should find at least 2 gray code pairs");
+    assert!(
+        pairs_ref.len() >= 2,
+        "Should find at least 2 gray code pairs"
+    );
 }
 
 #[test]
@@ -312,7 +326,8 @@ fn test_consistency_multiple_seeds() {
         let group2_indices: Vec<usize> = (50..100).collect();
 
         let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-        let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+        let pairs_fxhash =
+            find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
         let set_ref = pairs_to_set(&pairs_ref);
         let set_fxhash = pairs_to_set(&pairs_fxhash);
@@ -337,13 +352,17 @@ fn test_consistency_varying_bit_patterns() {
         let group2_indices: Vec<usize> = (50..100).collect();
 
         let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-        let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+        let pairs_fxhash =
+            find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
         let set_ref = pairs_to_set(&pairs_ref);
         let set_fxhash = pairs_to_set(&pairs_fxhash);
 
-        assert_eq!(set_ref, set_fxhash,
-                   "Bits {}/{}: Pairs don't match", bits_g1, bits_g2);
+        assert_eq!(
+            set_ref, set_fxhash,
+            "Bits {}/{}: Pairs don't match",
+            bits_g1, bits_g2
+        );
     }
 }
 
@@ -357,10 +376,10 @@ fn test_consistency_u128_large_values() {
 
     // Force some values to use high bits
     for encoding in &mut group1_encodings {
-        *encoding |= 1u128 << 100;  // Set bit 100
+        *encoding |= 1u128 << 100; // Set bit 100
     }
     for encoding in &mut group2_encodings {
-        *encoding |= 1u128 << 100;  // Set bit 100
+        *encoding |= 1u128 << 100; // Set bit 100
     }
 
     let mut raw_encodings = group1_encodings.clone();
@@ -370,7 +389,8 @@ fn test_consistency_u128_large_values() {
     let group2_indices: Vec<usize> = (50..100).collect();
 
     let pairs_ref = find_gray_code_pairs_ref(&group1_indices, &group2_indices, &raw_encodings);
-    let pairs_fxhash = find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
+    let pairs_fxhash =
+        find_gray_code_pairs_fxhash(&group1_indices, &group2_indices, &raw_encodings);
 
     let set_ref = pairs_to_set(&pairs_ref);
     let set_fxhash = pairs_to_set(&pairs_fxhash);

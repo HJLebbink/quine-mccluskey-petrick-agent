@@ -6,8 +6,11 @@
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-/// AVX512 version for u32 (processes 16 at a time)
-/// Returns vector of (i, j) pairs that are gray codes
+/// AVX-512 version for u32 (processes 16 u32 values at a time per ZMM register).
+///
+/// For each implicant in group1, broadcast-compare against 16 implicants from
+/// group2 simultaneously using popcount + equality mask. Falls back to
+/// scalar reference implementation when AVX-512 is unavailable.
 #[cfg(target_arch = "x86_64")]
 pub fn find_gray_code_pairs_avx512_u32(
     group1_indices: &[usize],
@@ -21,7 +24,8 @@ pub fn find_gray_code_pairs_avx512_u32(
     }
 
     let mut pairs = Vec::new();
-    let group2_values: Vec<u32> = group2_indices.iter()
+    let group2_values: Vec<u32> = group2_indices
+        .iter()
         .map(|&idx| raw_encodings[idx])
         .collect();
 
@@ -66,8 +70,11 @@ pub fn find_gray_code_pairs_avx512_u32(
     pairs
 }
 
-/// Process gray code checks in batches using AVX512
-/// Returns vector of (i, j) pairs that are gray codes
+/// Process gray code checks in batches using AVX-512 (8 u64 values per ZMM register).
+///
+/// For each implicant in group1, broadcast-compare against 8 implicants from
+/// group2 simultaneously using popcount + equality mask. Falls back to
+/// scalar reference implementation when AVX-512 is unavailable.
 #[cfg(target_arch = "x86_64")]
 pub fn find_gray_code_pairs_avx512_u64(
     group1_indices: &[usize],
@@ -84,7 +91,8 @@ pub fn find_gray_code_pairs_avx512_u64(
     let mut pairs = Vec::new();
 
     // Gather group2 values into contiguous array for better vectorization
-    let group2_values: Vec<u64> = group2_indices.iter()
+    let group2_values: Vec<u64> = group2_indices
+        .iter()
         .map(|&idx| raw_encodings[idx])
         .collect();
 
@@ -138,9 +146,11 @@ pub fn find_gray_code_pairs_avx512_u64(
     pairs
 }
 
-
-/// AVX512 version for u128 (processes 4 pairs of u64 at a time)
-/// Returns vector of (i, j) pairs that are gray codes
+/// AVX-512 version for u128 (processes 4 u128 values at a time via AVX2 u64 lanes).
+///
+/// Splits u128 into low/high u64 halves, computes popcount on each half using
+/// AVX2, adds them, and compares to 1. Falls back to scalar reference
+/// implementation when AVX-512 is unavailable.
 #[cfg(target_arch = "x86_64")]
 pub fn find_gray_code_pairs_avx512_u128(
     group1_indices: &[usize],
@@ -154,7 +164,8 @@ pub fn find_gray_code_pairs_avx512_u128(
     }
 
     let mut pairs = Vec::new();
-    let group2_values: Vec<u128> = group2_indices.iter()
+    let group2_values: Vec<u128> = group2_indices
+        .iter()
         .map(|&idx| raw_encodings[idx])
         .collect();
 
@@ -224,7 +235,10 @@ pub fn find_gray_code_pairs_avx512_u128(
     pairs
 }
 
-/// Finds all (i, j) pairs where encodings[i] and encodings[j] differ by exactly one bit.
+/// Find all (i, j) pairs where encodings differ by exactly one bit using reference implementation.
+///
+/// This is the scalar O(n×m) comparison between all pairs in group1 and group2.
+/// Used as fallback when SIMD is unavailable on non-x86_64 platforms.
 pub fn find_gray_code_pairs_ref<T: crate::qm::encoding::BitOps>(
     group1_indices: &[usize],
     group2_indices: &[usize],
@@ -243,8 +257,11 @@ pub fn find_gray_code_pairs_ref<T: crate::qm::encoding::BitOps>(
     pairs
 }
 
-/// Uses FxHash (fast integer hash) instead of SipHash for 3× speedup.
-/// Uses FxHashMap to map encoding values to their indices for O(1) lookup.
+/// Find all (i, j) gray code pairs using FxHashMap for O(1) lookup.
+///
+/// Faster than brute-force comparison: for each implicant in group1, flips
+/// one unset bit at a time and checks if the candidate exists in group2.
+/// Achieves ~3× speedup over reference implementation via reduced hash overhead.
 pub fn find_gray_code_pairs_fxhash<T: crate::qm::encoding::BitOps>(
     group1_indices: &[usize],
     group2_indices: &[usize],
@@ -254,10 +271,8 @@ pub fn find_gray_code_pairs_fxhash<T: crate::qm::encoding::BitOps>(
 
     // Build a mapping from encoding value to index for group2
     // Note: Uses more memory than HashSet but provides O(1) index lookup
-    let mut value_to_index: FxHashMap<T, usize> = FxHashMap::with_capacity_and_hasher(
-        group2_indices.len(),
-        Default::default()
-    );
+    let mut value_to_index: FxHashMap<T, usize> =
+        FxHashMap::with_capacity_and_hasher(group2_indices.len(), Default::default());
     for &j in group2_indices {
         value_to_index.insert(raw_encodings[j], j);
     }

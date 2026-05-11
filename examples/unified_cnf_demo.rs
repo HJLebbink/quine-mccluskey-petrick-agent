@@ -12,9 +12,9 @@ fn main() {
     // Example CNF: (A ∨ B) ∧ (A ∨ C) ∧ (B ∨ C)
     // Represented as bit vectors: A=bit0, B=bit1, C=bit2
     let cnf = vec![
-        0b011u64,  // A ∨ B
-        0b101u64,  // A ∨ C
-        0b110u64,  // B ∨ C
+        0b011u64, // A ∨ B
+        0b101u64, // A ∨ C
+        0b110u64, // B ∨ C
     ];
 
     // Encoding-aware API: Automatically selects optimal SIMD strategy
@@ -22,15 +22,24 @@ fn main() {
 
     // For small problems (≤16 variables), use Encoding16
     let dnf_16 = cnf_dnf::cnf_to_dnf::<Enc16>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
-    println!("  Encoding16: {} terms (auto-selected Avx512_16bits)", dnf_16.len());
+    println!(
+        "  Encoding16: {} terms (auto-selected Avx512_16bits)",
+        dnf_16.len()
+    );
 
     // For medium problems (≤32 variables), use Encoding32
     let dnf_32 = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
-    println!("  Encoding32: {} terms (auto-selected Avx512_32bits)", dnf_32.len());
+    println!(
+        "  Encoding32: {} terms (auto-selected Avx512_32bits)",
+        dnf_32.len()
+    );
 
     // For large problems (≤64 variables), use Encoding64
     let dnf_64 = cnf_dnf::cnf_to_dnf::<Enc64>(&cnf, 3, OptimizedFor::AutoDetect).unwrap();
-    println!("  Encoding64: {} terms (auto-selected Avx512_64bits)", dnf_64.len());
+    println!(
+        "  Encoding64: {} terms (auto-selected Avx512_64bits)",
+        dnf_64.len()
+    );
 
     // All encodings produce the same result!
     assert_eq!(dnf_16, dnf_32);
@@ -54,7 +63,14 @@ fn main() {
 
     // This works - 20 variables fits in Encoding32
     let result = cnf_dnf::cnf_to_dnf::<Enc32>(&cnf, 20, OptimizedFor::AutoDetect).unwrap();
-    println!("20 variables with Encoding32: ✓ {result} terms", result = if !result.is_empty() { format!("{}", result.len()) } else { "0".to_string() });
+    println!(
+        "20 variables with Encoding32: ✓ {result} terms",
+        result = if !result.is_empty() {
+            format!("{}", result.len())
+        } else {
+            "0".to_string()
+        }
+    );
 
     println!("\n=== Benefits ===");
     println!("✓ No need to manually choose OptimizedFor");

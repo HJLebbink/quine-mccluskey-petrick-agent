@@ -16,9 +16,7 @@ use std::collections::{HashMap, HashSet};
 /// 2. Enumerate all possible value combinations
 /// 3. For each combination, evaluate all branches in order
 /// 4. Map to output groups
-pub fn build_truth_table_with_comparisons(
-    branch_set: &BranchSet,
-) -> Result<TruthTable, String> {
+pub fn build_truth_table_with_comparisons(branch_set: &BranchSet) -> Result<TruthTable, String> {
     // Collect all variables and infer types if not declared
     let mut all_vars = HashSet::new();
     for branch in &branch_set.branches {
@@ -65,10 +63,7 @@ pub fn build_truth_table_with_comparisons(
     let mut dont_cares = Vec::new();
 
     // Enumerate all combinations
-    let mut assignments: Vec<i32> = variables
-        .iter()
-        .map(|v| var_types[v].min_value())
-        .collect();
+    let mut assignments: Vec<i32> = variables.iter().map(|v| var_types[v].min_value()).collect();
 
     for minterm_idx in 0..total_combinations as u64 {
         // Build assignment maps
@@ -99,10 +94,7 @@ pub fn build_truth_table_with_comparisons(
         // Record output
         match output {
             Some(out) => {
-                output_groups
-                    .entry(out)
-                    .or_default()
-                    .push(minterm_idx);
+                output_groups.entry(out).or_default().push(minterm_idx);
             }
             None => {
                 if let Some(ref default) = branch_set.default_output {
@@ -189,10 +181,7 @@ mod tests {
         branches.declare_int("x", 0, 3);
 
         branches.add_branch(
-            BoolExpr::and(
-                BoolExpr::var("a"),
-                BoolExpr::greater_than("x", 1),
-            ),
+            BoolExpr::and(BoolExpr::var("a"), BoolExpr::greater_than("x", 1)),
             "1",
         );
         branches.set_default("0");

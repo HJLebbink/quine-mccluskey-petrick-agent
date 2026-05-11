@@ -59,21 +59,11 @@ pub fn evaluate_with_ints(
                 || evaluate_with_ints(right, bool_assignments, int_assignments)
         }
         // Comparison operators
-        BoolExpr::Equals(var, value) => {
-            int_assignments.get(var) == Some(value)
-        }
-        BoolExpr::NotEquals(var, value) => {
-            int_assignments.get(var) != Some(value)
-        }
-        BoolExpr::LessThan(var, value) => {
-            int_assignments.get(var).is_some_and(|v| v < value)
-        }
-        BoolExpr::LessOrEqual(var, value) => {
-            int_assignments.get(var).is_some_and(|v| v <= value)
-        }
-        BoolExpr::GreaterThan(var, value) => {
-            int_assignments.get(var).is_some_and(|v| v > value)
-        }
+        BoolExpr::Equals(var, value) => int_assignments.get(var) == Some(value),
+        BoolExpr::NotEquals(var, value) => int_assignments.get(var) != Some(value),
+        BoolExpr::LessThan(var, value) => int_assignments.get(var).is_some_and(|v| v < value),
+        BoolExpr::LessOrEqual(var, value) => int_assignments.get(var).is_some_and(|v| v <= value),
+        BoolExpr::GreaterThan(var, value) => int_assignments.get(var).is_some_and(|v| v > value),
         BoolExpr::GreaterOrEqual(var, value) => {
             int_assignments.get(var).is_some_and(|v| v >= value)
         }
@@ -188,10 +178,7 @@ mod tests {
     fn test_build_truth_table_simple() {
         // if a && b { return "1" } else { return "0" }
         let mut branch_set = BranchSet::new();
-        branch_set.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branch_set.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         branch_set.set_default("0");
 
         let table = build_truth_table(&branch_set).unwrap();
@@ -216,10 +203,7 @@ mod tests {
         // elif a && !b { return "1" }
         // else { return "0" }
         let mut branch_set = BranchSet::new();
-        branch_set.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branch_set.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         branch_set.add_branch(
             BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",

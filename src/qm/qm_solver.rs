@@ -2,7 +2,9 @@
 
 use super::encoding::{BitOps, MintermEncoding};
 use super::implicant::{BitState, Implicant};
-use super::min_cubes::{find_prime_implicants, populate_covered_minterms_u64, prime_cubes_to_implicants, TruthTable};
+use super::min_cubes::{
+    TruthTable, find_prime_implicants, populate_covered_minterms_u64, prime_cubes_to_implicants,
+};
 use super::petricks_method::PetricksMethod;
 use super::qm_result::QMResult;
 use super::quine_mccluskey::QuineMcCluskey;
@@ -16,6 +18,7 @@ pub struct QMSolver<E: MintermEncoding> {
 }
 
 impl<E: MintermEncoding> QMSolver<E> {
+    /// Create a new solver with auto-generated variable names (A, B, C, ...).
     pub fn new(variables: usize) -> Self {
         //TODO if variables > 26, should we generate names like AA, BB, ...?
         let variable_names = (0..variables)
@@ -25,23 +28,44 @@ impl<E: MintermEncoding> QMSolver<E> {
         Self::with_variable_names(variables, variable_names)
     }
 
+    /// Create a new solver with custom variable names.
+    ///
+    /// The number of variables must match the length of `names`.
     pub fn with_variable_names(variables: usize, names: Vec<String>) -> Self {
         Self {
             variables,
-            minterms:  Vec::with_capacity(0),
-            dont_cares:  Vec::with_capacity(0),
+            minterms: Vec::with_capacity(0),
+            dont_cares: Vec::with_capacity(0),
             variable_names: names,
         }
     }
 
+    /// Set the minterms that must be covered by the minimization.
     pub fn set_minterms(&mut self, minterms: Vec<E::Value>) {
         self.minterms = minterms;
     }
 
+    /// Set the don't-care minterms that may be used during minimization
+    /// but do not need to be covered in the final expression.
     pub fn set_dont_cares(&mut self, dont_cares: Vec<E::Value>) {
         self.dont_cares = dont_cares;
     }
 
+    /// Solve the Quine-McCluskey minimization problem using Hamming-distance-1
+    /// merging. Produces a `QMResult` containing the minimized SOP expression,
+    /// all prime implicants, essential prime implicants, solution steps, and
+    /// cost metrics.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create a `QuineMcCluskey` instance and populate it with minterms
+    ///    and don't-care terms
+    /// 2. Find all prime implicants through iterative combining
+    /// 3. Identify essential prime implicants (those uniquely covering at
+    ///    least one minterm)
+    /// 4. Apply Petrick's method to select a minimal cover
+    /// 5. Format the result into a `QMResult` with SOP expression,
+    ///    implicant lists, solution steps, and cost metrics
     pub fn solve(&self) -> QMResult {
         let mut qm = QuineMcCluskey::<E>::new(self.variables);
         qm.set_minterms(self.minterms.clone());
@@ -70,7 +94,8 @@ impl<E: MintermEncoding> QMSolver<E> {
             return "0".to_string();
         }
 
-        implicants.iter()
+        implicants
+            .iter()
             .map(|imp| self.format_single_implicant(imp))
             .collect::<Vec<_>>()
             .join(" + ")
@@ -82,7 +107,7 @@ impl<E: MintermEncoding> QMSolver<E> {
             match implicant.get_bit(i) {
                 BitState::Zero => result.push_str(&format!("{}'", self.variable_names[i])),
                 BitState::One => result.push_str(&self.variable_names[i]),
-                BitState::DontCare => {},
+                BitState::DontCare => {}
             }
         }
         if result.is_empty() {
@@ -93,7 +118,8 @@ impl<E: MintermEncoding> QMSolver<E> {
     }
 
     fn format_implicants(&self, implicants: &[Implicant<E>]) -> Vec<String> {
-        implicants.iter()
+        implicants
+            .iter()
             .map(|imp| self.format_single_implicant(imp))
             .collect()
     }
@@ -107,8 +133,12 @@ impl<E: MintermEncoding> QMSolver<E> {
     // -----------------------------------------------------------------------
 
     /// Solve using the min-cubes prime implicant generation algorithm.
+    ///
     /// Produces an identical `QMResult` as `solve()` but via condition
     /// combination enumeration instead of Hamming-distance-1 merging.
+    /// The min-cubes approach iterates through condition subsets and builds
+    /// cubes from valid signatures, which can be significantly faster for
+    /// dense problems with many variables.
     pub fn solve_min_cubes(&self) -> QMResult {
         // 1. Build truth table from minterms + dont-cares
         let n_conds = self.variables;
@@ -125,7 +155,12 @@ impl<E: MintermEncoding> QMSolver<E> {
         let mut pis = prime_cubes_to_implicants(&cubies, n_conds);
 
         // 4. Populate covered_minterms for Petrick's method and essential PI detection
-        let all_true: Vec<E::Value> = self.minterms.iter().chain(self.dont_cares.iter()).cloned().collect();
+        let all_true: Vec<E::Value> = self
+            .minterms
+            .iter()
+            .chain(self.dont_cares.iter())
+            .cloned()
+            .collect();
         populate_covered_minterms_u64(&mut pis, &all_true, n_conds);
 
         // 5. Find essential prime implicants
@@ -139,10 +174,19 @@ impl<E: MintermEncoding> QMSolver<E> {
         let minimized_expression = self.format_expression(&minimal_cover);
 
         let steps = vec![
-            format!("Step 1: Built truth table with {} positive, {} negative rows", tt.pos_rows, tt.neg_rows),
+            format!(
+                "Step 1: Built truth table with {} positive, {} negative rows",
+                tt.pos_rows, tt.neg_rows
+            ),
             format!("Step 2: Found {} prime implicants via min-cubes", pis.len()),
-            format!("Step 3: Identified {} essential prime implicants", essential_pis.len()),
-            format!("Step 4: Petrick's method selected {} PIs for minimal cover", minimal_cover.len()),
+            format!(
+                "Step 3: Identified {} essential prime implicants",
+                essential_pis.len()
+            ),
+            format!(
+                "Step 4: Petrick's method selected {} PIs for minimal cover",
+                minimal_cover.len()
+            ),
         ];
 
         QMResult {
@@ -156,8 +200,15 @@ impl<E: MintermEncoding> QMSolver<E> {
     }
 }
 
-/// Find essential prime implicants (those uniquely covering at least one minterm)
-fn find_essential_pis<E: MintermEncoding>(pis: &[Implicant<E>], minterms: &[E::Value]) -> Vec<Implicant<E>> {
+/// Find essential prime implicants — those that uniquely cover at least one minterm.
+///
+/// A prime implicant is essential if there exists at least one minterm that it
+/// covers exclusively (no other prime implicant covers that minterm).
+/// Essential prime implicants MUST be included in any minimal cover.
+fn find_essential_pis<E: MintermEncoding>(
+    pis: &[Implicant<E>],
+    minterms: &[E::Value],
+) -> Vec<Implicant<E>> {
     // Build coverage map: minterm -> list of PIs that cover it
     let mut coverage_map: std::collections::HashMap<E::Value, Vec<usize>> =
         std::collections::HashMap::new();

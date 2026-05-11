@@ -48,16 +48,24 @@ fn test_dead_code_detection() {
     // Second branch should be detected as dead code
     let dead_code = &json["analysis"]["dead_code"];
     assert!(dead_code.is_array());
-    assert!(!dead_code.as_array().unwrap().is_empty(), "Should detect dead code");
+    assert!(
+        !dead_code.as_array().unwrap().is_empty(),
+        "Should detect dead code"
+    );
 
     let first_dead = &dead_code[0];
     assert_eq!(first_dead["branch_index"], 1);
-    assert!(first_dead["covered_by"].as_array().unwrap().contains(&Value::from(0)));
+    assert!(
+        first_dead["covered_by"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::from(0))
+    );
 }
 
 #[test]
 #[ignore] // TODO: Parser doesn't support comparison operators yet (< > ==)
-           // These work via programmatic API but not via string parsing
+// These work via programmatic API but not via string parsing
 fn test_integer_variables() {
     let input = r#"{
         "variables": {
@@ -72,7 +80,10 @@ fn test_integer_variables() {
     let result = agent_api::simplify_from_json(input).unwrap();
     let json: Value = serde_json::from_str(&result).unwrap();
 
-    assert_eq!(json["metrics"]["variables_used"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        json["metrics"]["variables_used"].as_array().unwrap().len(),
+        1
+    );
     assert_eq!(json["analysis"]["coverage_percent"], 100.0);
 }
 
@@ -98,7 +109,10 @@ fn test_coverage_analysis() {
     // Should have uncovered minterms
     let gaps = &json["analysis"]["coverage_gaps"];
     assert!(gaps.is_array());
-    assert!(!gaps.as_array().unwrap().is_empty(), "Should report coverage gaps");
+    assert!(
+        !gaps.as_array().unwrap().is_empty(),
+        "Should report coverage gaps"
+    );
 }
 
 #[test]

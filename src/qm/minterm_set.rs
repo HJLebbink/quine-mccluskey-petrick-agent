@@ -17,6 +17,10 @@ pub struct MintermSet<E: MintermEncoding> {
 }
 
 impl<E: MintermEncoding> MintermSet<E> {
+    /// Create a new empty minterm set with buckets for all possible bit counts.
+    ///
+    /// The bucket count is determined by `E::BUCKET_WIDTH`, which depends
+    /// on the encoding type (33 for Encoding16, 65 for Encoding32, 129 for Encoding64).
     pub fn new() -> Self {
         Self {
             data: vec![Vec::new(); E::BUCKET_WIDTH],
@@ -25,6 +29,8 @@ impl<E: MintermEncoding> MintermSet<E> {
         }
     }
 
+    /// Add a single minterm to the set, placing it in the bucket
+    /// corresponding to its Hamming weight (number of 1 bits).
     pub fn add(&mut self, value: E::Value) {
         let bit_count = value.count_ones() as usize;
         if bit_count > self.max_bit_count {
@@ -33,16 +39,19 @@ impl<E: MintermEncoding> MintermSet<E> {
         self.data[bit_count].push(value);
     }
 
+    /// Add multiple minterms to the set in a single call.
     pub fn add_all(&mut self, values: &[E::Value]) {
         for &value in values {
             self.add(value);
         }
     }
 
+    /// Get a reference to the bucket for the given Hamming weight.
     pub fn get(&self, bit_count: usize) -> &[E::Value] {
         &self.data[bit_count]
     }
 
+    /// Get the maximum Hamming weight of any minterm added so far.
     pub fn get_max_bit_count(&self) -> usize {
         self.max_bit_count
     }

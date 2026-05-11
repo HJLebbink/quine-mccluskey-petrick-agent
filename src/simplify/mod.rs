@@ -134,10 +134,7 @@ mod tests {
     fn test_end_to_end_simplification() {
         // Test case: a && b || a && !b should simplify to just a
         let mut branches = BranchSet::new();
-        branches.add_branch(
-            BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")),
-            "1",
-        );
+        branches.add_branch(BoolExpr::and(BoolExpr::var("a"), BoolExpr::var("b")), "1");
         branches.add_branch(
             BoolExpr::and(BoolExpr::var("a"), BoolExpr::negate(BoolExpr::var("b"))),
             "1",

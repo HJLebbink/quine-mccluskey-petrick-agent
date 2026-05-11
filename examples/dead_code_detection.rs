@@ -1,6 +1,6 @@
 // Example: Dead Code Detection in if-then-else chains
 
-use qm_agent::simplify::{format_result, parse_bool_expr, simplify_branches, BranchSet};
+use qm_agent::simplify::{BranchSet, format_result, parse_bool_expr, simplify_branches};
 
 fn main() {
     println!("=== Dead Code Detection Demo ===\n");

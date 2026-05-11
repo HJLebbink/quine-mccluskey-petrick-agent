@@ -5,9 +5,9 @@
 //! - Scalar implementation: Checks each minterm-implicant pair individually
 //! - SIMD implementation: Checks 512 pairs simultaneously using AVX-512
 
+use qm_agent::qm::CoverageMatrix;
 use qm_agent::qm::encoding::Enc16;
 use qm_agent::qm::implicant::{BitState, Implicant};
-use qm_agent::qm::CoverageMatrix;
 use std::time::{Duration, Instant};
 
 const NUM_PRIME_IMPLICANTS: usize = 100;
@@ -107,11 +107,16 @@ fn main() {
     println!("Configuration:");
     println!("  Prime implicants: {}", NUM_PRIME_IMPLICANTS);
     println!("  Minterms: {}", NUM_MINTERMS);
-    println!("  Total checks: {} million",
-        (NUM_PRIME_IMPLICANTS * NUM_MINTERMS) / 1_000_000);
+    println!(
+        "  Total checks: {} million",
+        (NUM_PRIME_IMPLICANTS * NUM_MINTERMS) / 1_000_000
+    );
     println!("  Warmup iterations: {}", WARMUP_ITERATIONS);
     println!("  Benchmark iterations: {}", BENCHMARK_ITERATIONS);
-    println!("  SIMD available: {}\n", if simd_available { "Yes" } else { "No" });
+    println!(
+        "  SIMD available: {}\n",
+        if simd_available { "Yes" } else { "No" }
+    );
 
     // Generate test data
     println!("Generating test data...");
@@ -184,7 +189,10 @@ fn main() {
     println!("  Average: {:?}", scalar_avg);
     println!("  Min: {:?}", scalar_min);
     println!("  Max: {:?}", scalar_max);
-    println!("  Throughput: {:.2} million checks/sec\n", scalar_checks_per_sec / 1_000_000.0);
+    println!(
+        "  Throughput: {:.2} million checks/sec\n",
+        scalar_checks_per_sec / 1_000_000.0
+    );
 
     // Benchmark SIMD implementation
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
@@ -207,7 +215,10 @@ fn main() {
         println!("  Average: {:?}", simd_avg);
         println!("  Min: {:?}", simd_min);
         println!("  Max: {:?}", simd_max);
-        println!("  Throughput: {:.2} million checks/sec\n", simd_checks_per_sec / 1_000_000.0);
+        println!(
+            "  Throughput: {:.2} million checks/sec\n",
+            simd_checks_per_sec / 1_000_000.0
+        );
 
         // Calculate speedup
         let speedup = scalar_avg.as_secs_f64() / simd_avg.as_secs_f64();
@@ -221,7 +232,10 @@ fn main() {
         // Efficiency analysis
         let theoretical_max_speedup = 512.0; // Process 512 values simultaneously
         let efficiency = (speedup / theoretical_max_speedup) * 100.0;
-        println!("\n  Theoretical max speedup: {:.0}× (512 values in parallel)", theoretical_max_speedup);
+        println!(
+            "\n  Theoretical max speedup: {:.0}× (512 values in parallel)",
+            theoretical_max_speedup
+        );
         println!("  Efficiency: {:.1}%", efficiency);
 
         if speedup > 1.5 {
