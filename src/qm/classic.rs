@@ -125,7 +125,7 @@ pub fn reduce_minterms_classic<E: MintermEncoding>(
                 checked[j] = true;
                 let new_mt = replace_complements::<E>(term_i, term_j);
 
-                if show_info {
+                if false {
                     println!(
                         "INFO: 09f28d3a: term_i: {}",
                         minterm_to_string::<E>(n_variables, term_i)
@@ -207,7 +207,7 @@ pub fn reduce_minterms<E: MintermEncoding>(
                     checked_x[bit_count + 1][j] = true;
                     let new_mt = replace_complements::<E>(term_i, term_j);
 
-                    if show_info {
+                    if false {
                         println!(
                             "INFO: 09f28d3a: term_i: {}",
                             minterm_to_string::<E>(3, term_i)
@@ -871,8 +871,7 @@ pub fn reduce_qm<E: MintermEncoding>(
 
         if show_info {
             println!(
-                "INFO: 361a49a4: reduce_qm: iteration {}; minterms {}; next minterms {}",
-                iteration,
+                "INFO: 361a49a4: reduce_qm: iteration {iteration}; minterms {}; next minterms {}",
                 minterms.len(),
                 next_minterms.len()
             );

@@ -103,7 +103,7 @@ fn main() {
     let var_names: Vec<String> = (0..n)
         .map(|i| char::from(b'A' + i as u8).to_string())
         .collect();
-    let mut solver1 = QMSolver::<Enc16>::with_variable_names(n as usize, var_names);
+    let mut solver1 = QMSolver::<Enc16>::new_with_variable_names(n as usize, var_names);
     solver1.set_minterms(minterms.iter().map(|&x| x as u32).collect());
     let result_qm = solver1.solve();
     let qm_dur = t0.elapsed();

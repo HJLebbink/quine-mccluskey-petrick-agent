@@ -15,6 +15,7 @@ pub struct QMSolver<E: MintermEncoding> {
     minterms: Vec<E::Value>,
     dont_cares: Vec<E::Value>,
     variable_names: Vec<String>,
+    logging_on: bool,
 }
 
 impl<E: MintermEncoding> QMSolver<E> {
@@ -25,21 +26,26 @@ impl<E: MintermEncoding> QMSolver<E> {
             .map(|i| ((b'A' + i as u8) as char).to_string())
             .collect();
 
-        Self::with_variable_names(variables, variable_names)
+        Self::new_with_variable_names(variables, variable_names)
     }
 
     /// Create a new solver with custom variable names.
     ///
     /// The number of variables must match the length of `names`.
-    pub fn with_variable_names(variables: usize, names: Vec<String>) -> Self {
+    pub fn new_with_variable_names(variables: usize, names: Vec<String>) -> Self {
         Self {
             variables,
             minterms: Vec::with_capacity(0),
             dont_cares: Vec::with_capacity(0),
             variable_names: names,
+            logging_on: false,
         }
     }
 
+    pub fn set_logging(&mut self, logging_on: bool) {
+        self.logging_on = logging_on;
+    }
+    
     /// Set the minterms that must be covered by the minimization.
     pub fn set_minterms(&mut self, minterms: Vec<E::Value>) {
         self.minterms = minterms;
@@ -68,15 +74,13 @@ impl<E: MintermEncoding> QMSolver<E> {
     ///    implicant lists, solution steps, and cost metrics
     pub fn solve(&self) -> QMResult {
         let mut qm = QuineMcCluskey::<E>::new(self.variables);
+        qm.set_logging_on(self.logging_on);
         qm.set_minterms(self.minterms.clone());
         qm.set_dont_cares(self.dont_cares.clone());
 
-        let prime_implicants = qm.find_prime_implicants();
-        let essential_pis = qm.find_essential_prime_implicants();
-
+        let (essential_pis, prime_implicants) = qm.find_essential_prime_implicants();
         let petricks = PetricksMethod::<E>::new(&prime_implicants, &self.minterms);
         let minimal_cover = petricks.find_minimal_cover();
-
         let minimized_expression = self.format_expression(&minimal_cover);
 
         QMResult {

@@ -85,7 +85,7 @@ fn main() {
         .collect();
 
     let t0 = Instant::now();
-    let mut solver = QMSolver::<Enc16>::with_variable_names(n as usize, var_names);
+    let mut solver = QMSolver::<Enc16>::new_with_variable_names(n as usize, var_names);
     solver.set_minterms(minterms.iter().map(|&x| x as u32).collect());
     let result = solver.solve();
     let total = t0.elapsed();

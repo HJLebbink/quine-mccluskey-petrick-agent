@@ -5,6 +5,7 @@
 
 use super::encoding::{BitOps, MintermEncoding};
 use smallvec::smallvec;
+use crate::qm::quine_mccluskey::validate_prime_implicant;
 
 /// State of a bit in an implicant: Zero, One, or DontCare
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,7 +92,12 @@ impl<E: MintermEncoding> Implicant<E> {
 
     #[inline]
     pub fn replace_complements(a: E::Value, b: E::Value, variables: usize) -> E::Value {
-        a | b | ((a ^ b) << variables)
+        let dont_care_mask: E::Value = a ^ b; // Bits that differ between a and b
+        let result = a | b | (dont_care_mask << variables) | dont_care_mask;
+
+        #[cfg(debug_assertions)]
+        validate_prime_implicant::<E>(&result, variables);
+        result
     }
 
     /// Convert implicant to raw encoding for batch operations.
@@ -109,14 +115,12 @@ impl<E: MintermEncoding> Implicant<E> {
                     // data bit stays 0
                 }
                 BitState::DontCare => {
-                    data = data.set_bit(bit_pos); // set data bit to 1
                     dont_care = dont_care.set_bit(bit_pos);
                 }
             }
         }
-
-        // data in lower bits, don't-care mask in upper bits
-        data | (dont_care << variables)
+        // data in lower bits, don't-care mask in upper bits; set data bits to 1 if don't care mask is set
+        data | (dont_care << variables) | dont_care
     }
 
     /// Create from raw encoding (internal use only).
@@ -125,7 +129,7 @@ impl<E: MintermEncoding> Implicant<E> {
         let data = raw & mask;
         let dont_care_mask = raw >> variables;
 
-        let mut bits = smallvec![BitState::DontCare; variables];
+        let mut bits = smallvec![BitState::Zero; variables];
         for i in 0..variables {
             let bit_pos = (variables - 1) - i;
             if dont_care_mask.get_bit(bit_pos) {
@@ -133,7 +137,7 @@ impl<E: MintermEncoding> Implicant<E> {
             } else if data.get_bit(bit_pos) {
                 bits[i] = BitState::One;
             } else {
-                bits[i] = BitState::Zero;
+                //bits[i] = BitState::Zero;
             }
         }
 
@@ -147,7 +151,6 @@ impl<E: MintermEncoding> Implicant<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Enc16;
     use crate::qm::encoding::Enc32;
 
     #[test]

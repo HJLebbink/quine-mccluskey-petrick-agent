@@ -2,7 +2,7 @@
 // This allows working with up to 64 Boolean variables
 
 use qm_agent::qm::random::generate_random_minterms;
-use qm_agent::qm::{reduce_minterms, Enc64};
+use qm_agent::{QMSolver, Enc64};
 
 fn main() {
 
@@ -11,21 +11,24 @@ fn main() {
     println!("============================================\n");
 
     const NUM_VARIABLES: usize = 33;
-    const NUM_MINTERMS: usize = 500000;
+    const NUM_MINTERMS: usize = 700000;
     const SEED: u64 = 42;
 
     println!("Generating random minterms with {NUM_VARIABLES} variables");
     let minterms: Vec<u128> = generate_random_minterms(NUM_VARIABLES, NUM_MINTERMS, SEED);
 
     println!("Generated {NUM_MINTERMS} random minterms");
-    println!();
-
+    println!("Solving with QMSolver...");
+    let start = std::time::Instant::now();
+    
     println!("Reducing minterms with Encoding64...");
-    let start_large = std::time::Instant::now();
-    let reduced = reduce_minterms::<Enc64>(&minterms, false);
-    let elapsed_large = start_large.elapsed();
+    let mut solver = QMSolver::<Enc64>::new(NUM_VARIABLES);
+    solver.set_minterms(minterms);
+    let result = solver.solve();
+    
+    let elapsed = start.elapsed();
 
-    println!("Reduction completed in {elapsed_large:?}");
-    println!("Reduced from {} to {} terms", minterms.len(), reduced.len());
-    println!();
+    println!("Solved in {:?}", elapsed);
+    println!("\nnumber of Prime Implicants: {}",  result.prime_implicants.len());
+    println!("\nnumber of Essential Prime Implicants: {}", result.essential_prime_implicants.len());
 }

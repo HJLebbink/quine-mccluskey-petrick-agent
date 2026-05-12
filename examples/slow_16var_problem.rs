@@ -92,7 +92,7 @@ fn main() {
     let var_names: Vec<String> = (0..n_vars)
         .map(|i| char::from(b'A' + i as u8).to_string())
         .collect();
-    let mut solver = QMSolver::<Enc16>::with_variable_names(n_vars, var_names.clone());
+    let mut solver = QMSolver::<Enc16>::new_with_variable_names(n_vars, var_names.clone());
     solver.set_minterms(m_interms.clone().iter().map(|&x| x as u32).collect());
 
     let qm_start = Instant::now();

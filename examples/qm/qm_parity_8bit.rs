@@ -35,8 +35,9 @@ fn main() {
     println!();
 
     let mut solver = QMSolver::<Enc32>::new(variables);
+    solver.set_logging(true);
     let minterms_u64: Vec<u64> = minterms.iter().map(|&x| x as u64).collect();
-    solver.set_minterms(&minterms_u64);
+    solver.set_minterms(minterms_u64);
 
     println!("Computing minimization (this may take a moment)...");
     let result = solver.solve();

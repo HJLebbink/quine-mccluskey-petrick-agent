@@ -111,7 +111,7 @@ fn minimize_for_output(
     // Enc16 uses u32 (faster for ≤16 vars), Enc32 uses u64 (needed for >16 vars)
     if var_count <= 16 {
         // Use Enc16 (u32) - no conversion needed!
-        let mut solver = QMSolver::<Enc16>::with_variable_names(var_count, table.variables.clone());
+        let mut solver = QMSolver::<Enc16>::new_with_variable_names(var_count, table.variables.clone());
 
         solver.set_minterms(minterms.iter().map(|&x| x as u32).collect());
         solver.set_dont_cares(dont_cares.iter().map(|&x| x as u32).collect());
@@ -133,7 +133,7 @@ fn minimize_for_output(
 
         parse_qm_result(&result.minimized_expression, &table.variables)
     } else if var_count <= 32 {
-        let mut solver = QMSolver::<Enc32>::with_variable_names(var_count, table.variables.clone());
+        let mut solver = QMSolver::<Enc32>::new_with_variable_names(var_count, table.variables.clone());
 
         solver.set_minterms(minterms.to_vec());
         solver.set_dont_cares(dont_cares.to_vec());
@@ -155,7 +155,7 @@ fn minimize_for_output(
 
         parse_qm_result(&result.minimized_expression, &table.variables)
     } else {
-        let mut solver = QMSolver::<Enc64>::with_variable_names(var_count, table.variables.clone());
+        let mut solver = QMSolver::<Enc64>::new_with_variable_names(var_count, table.variables.clone());
 
         solver.set_minterms(minterms.iter().map(|&x| x as u128).collect());
         solver.set_dont_cares(dont_cares.iter().map(|&x| x as u128).collect());

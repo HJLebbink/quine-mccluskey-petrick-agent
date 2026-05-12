@@ -45,7 +45,7 @@ fn main() {
     .collect();
 
     // Create QM solver with variable names
-    let mut solver = QMSolver::<Enc16>::with_variable_names(16, var_names);
+    let mut solver = QMSolver::<Enc16>::new_with_variable_names(16, var_names);
 
     println!("⏱️  Step 1: Setting up problem...");
     println!("   Variables: 16");

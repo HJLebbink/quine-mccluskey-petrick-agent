@@ -1,16 +1,32 @@
 //! Equational Quine-McCluskey (eQMC) — Optimized Ternary Superset Algorithm
 //!
-//! Optimized for sparse problems by processing supersets in priority order
-//! and pruning early when supersets overlap with negatives.
+//! **NOTE: This implementation is known to be suboptimal and is kept for
+//! reference and inspiration for better algorithms, not as a production
+//! prime-implicant generator.**
+//!
+//! The algorithm generates all 2^n supersets per positive minterm and
+//! processes them in generality-ordered priority (most don't-cares first),
+//! pruning when supersets overlap with negatives or are subsumed by
+//! already-added PIs. This top-down approach finds maximal cubes early
+//! and produces generality-sorted output useful for set-cover solvers,
+//! but the O(pos·2^n) superset enumeration is slower than both classic
+//! QM (for dense/few-PI cases) and CCubes (for sparse cases).
+//!
+//! The key insight — generality-sorted priority processing of supersets —
+//! is preserved as a design pattern for future algorithm work.
 
 use super::primes::{PrimeCube, TruthTable};
 
 /// eQMC: Find prime implicants using ternary superset method.
-/// 
-/// Optimized version that:
-/// 1. Processes supersets by decreasing generality (most don't-cares first)
-/// 2. Prunes early when supersets overlap with negatives
-/// 3. Returns only maximal non-overlapping supersets
+///
+/// **NOTE: Suboptimal performance — kept for reference/inspiration only.**
+///
+/// Cost: O(pos·2^n) superset enumeration per minterm. For n=16 with 64
+/// positive rows this is ~4M supersets, outpaced by both QM and CCubes.
+///
+/// Key design pattern preserved: generality-sorted priority processing
+/// of supersets, which yields maximal cubes early and produces output
+/// already ordered for set-cover solvers.
 pub fn find_prime_implicants_eqmc(tt: &TruthTable) -> Vec<PrimeCube> {
     if tt.pos_rows == 0 {
         return Vec::new();

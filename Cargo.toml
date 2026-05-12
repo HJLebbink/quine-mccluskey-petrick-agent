@@ -37,6 +37,70 @@ predicates = "3.1"
 criterion = "0.7"
 proptest = "1.8"
 
+[[example]]
+name = "qm_64bit"
+path = "examples/qm/qm_64bit.rs"
+
+[[example]]
+name = "qm_essential_implicants"
+path = "examples/qm/qm_essential_implicants.rs"
+
+[[example]]
+name = "qm_comparison_14bit"
+path = "examples/qm/qm_comparison_14bit.rs"
+
+[[example]]
+name = "qm_krook_dataset"
+path = "examples/qm/qm_krook_dataset.rs"
+
+[[example]]
+name = "qm_parity_8bit"
+path = "examples/qm/qm_parity_8bit.rs"
+
+[[example]]
+name = "qm_petricks_method"
+path = "examples/qm/qm_petricks_method.rs"
+
+[[example]]
+name = "qm_random_12bit"
+path = "examples/qm/qm_random_12bit.rs"
+
+[[example]]
+name = "qm_simple_3bit"
+path = "examples/qm/qm_simple_3bit.rs"
+
+[[example]]
+name = "qm_wolfram_verified"
+path = "examples/qm/qm_wolfram_verified.rs"
+
+[[example]]
+name = "cnf_2_dnf_0"
+path = "examples/cnf_2_dnf/cnf_2_dnf_0.rs"
+
+[[example]]
+name = "cnf_2_dnf_1"
+path = "examples/cnf_2_dnf/cnf_2_dnf_1.rs"
+
+[[example]]
+name = "cnf_2_dnf_2"
+path = "examples/cnf_2_dnf/cnf_2_dnf_2.rs"
+
+[[example]]
+name = "cnf_2_dnf_3"
+path = "examples/cnf_2_dnf/cnf_2_dnf_3.rs"
+
+[[example]]
+name = "cnf_2_dnf_4"
+path = "examples/cnf_2_dnf/cnf_2_dnf_4.rs"
+
+[[example]]
+name = "cnf_2_dnf_5"
+path = "examples/cnf_2_dnf/cnf_2_dnf_5.rs"
+
+[[example]]
+name = "cnf_2_dnf_very_hard"
+path = "examples/cnf_2_dnf/cnf_2_dnf_very_hard.rs"
+
 [[bench]]
 name = "cnf_to_dnf_bench"
 harness = false
