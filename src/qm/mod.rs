@@ -59,6 +59,7 @@ pub use min_cubes::setcover::{
 pub use implicant::{BitState, Implicant};
 pub use petricks_method::PetricksMethod;
 pub use qm_result::QMResult;
+pub use qm_solver::SolveMethod;
 pub use qm_solver::QMSolver;
 pub use quine_mccluskey::QuineMcCluskey;
 pub use simd_coverage::CoverageMatrix;

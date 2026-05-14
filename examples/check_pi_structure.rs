@@ -112,7 +112,8 @@ fn main() {
 
     // Check unique QM vs min_cubes
     let t1 = Instant::now();
-    let result2 = solver.solve_min_cubes();
+    solver.set_method(qm_agent::SolveMethod::MinCubes);
+    let result2 = solver.solve();
     let mc_total = t1.elapsed();
 
     let mut mc_unique = std::collections::HashSet::new();

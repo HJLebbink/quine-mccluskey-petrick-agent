@@ -15,7 +15,7 @@ pub mod simplify; // If-then-else simplification // JSON API for Claude integrat
 pub use qm::PetricksMethod;
 pub use qm::{BitState, Implicant, QuineMcCluskey};
 pub use qm::{Enc16, Enc32, Enc64, MintermEncoding};
-pub use qm::{QMResult, QMSolver};
+pub use qm::{QMResult, QMSolver, SolveMethod};
 
 /// Convenience function to minimize a Boolean function (up to 64 variables)
 ///

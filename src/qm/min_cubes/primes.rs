@@ -3,9 +3,9 @@
 //! Implements the algorithm from "Minimize Cubes" (C++ reference).
 //! Iterates through condition combinations and verifies each candidate.
 
-use crate::qm::encoding::{BitOps, MintermEncoding};
-use crate::qm::implicant::{BitState, Implicant};
-use smallvec::smallvec;
+use crate::qm::encoding::BitOps;
+use crate::qm::encoding::MintermEncoding;
+use crate::qm::implicant::Implicant;
 
 /// Maximum number of conditions supported by PrimeCube
 pub const MAX_CONDITIONS: usize = 64;
@@ -392,9 +392,6 @@ pub fn find_prime_implicants(tt: &TruthTable, pi_depth: usize) -> Vec<PrimeCube>
 // ---------------------------------------------------------------------------
 
 /// Convert PrimeCubes to Implicant<E>[] for Petrick's method.
-///
-/// Translates each cube's 3-field encoding (cond, mask, data) into a
-/// vector of BitState values compatible with the QM solver pipeline.
 pub fn prime_cubes_to_implicants<E: MintermEncoding>(
     cubes: &[PrimeCube],
     variables: usize,
@@ -402,24 +399,22 @@ pub fn prime_cubes_to_implicants<E: MintermEncoding>(
     cubes
         .iter()
         .map(|cube| {
-            let mut bits = smallvec![];
-            for i in (0..variables).rev() {
+            let mut raw = E::Value::zero();
+            for i in 0..variables {
                 let is_used = (cube.cond >> i) & 1 == 1;
+                let is_dont_care = !is_used || (is_used && (cube.mask >> i) & 1 == 1);
+                let is_one = is_used && (cube.data >> i) & 1 == 1;
 
-                let state = if !is_used {
-                    // Unconditional don't-care: any value of this variable is fine
-                    BitState::DontCare
-                } else if (cube.mask >> i) & 1 == 1 {
-                    BitState::DontCare
-                } else if (cube.data >> i) & 1 == 1 {
-                    BitState::One
-                } else {
-                    BitState::Zero
-                };
-                bits.push(state);
+                if is_one || is_dont_care {
+                    raw = raw.set_bit(i);
+                }
+                if is_dont_care {
+                    raw = raw.set_bit(i + variables);
+                }
             }
             Implicant {
-                bits,
+                bits: raw,
+                n_variables: variables,
                 covered_minterms: std::collections::HashSet::new(),
             }
         })
@@ -434,33 +429,17 @@ pub fn prime_cubes_to_implicants<E: MintermEncoding>(
 pub fn populate_covered_minterms_u64<E: MintermEncoding>(
     pis: &mut [Implicant<E>],
     all_minterms: &[E::Value],
-    n_vars: usize,
+    _n_vars: usize,
 ) {
     for pi in pis.iter_mut() {
         let mut covered = std::collections::HashSet::new();
         for mt in all_minterms {
-            let raw = mt.to_u64();
-            if covers_implicant_u64(&pi.bits, raw, n_vars) {
+            if pi.covers_minterm(*mt) {
                 covered.insert(*mt);
             }
         }
         pi.covered_minterms = covered;
     }
-}
-
-/// Check if an Implicant covers a raw u64 minterm by matching bits
-fn covers_implicant_u64(bits: &[BitState], raw_minterm: u64, n_vars: usize) -> bool {
-    for (i, &state) in bits.iter().take(n_vars).enumerate() {
-        if state == BitState::DontCare {
-            continue;
-        }
-        let expected_u64 = if state == BitState::One { 1u64 } else { 0u64 };
-        let actual = (raw_minterm >> i) & 1;
-        if actual != expected_u64 {
-            return false;
-        }
-    }
-    true
 }
 
 /// Build a bit-packed coverage matrix mapping each prime implicant to its covered minterms.
@@ -696,16 +675,16 @@ mod tests {
         use crate::qm::implicant::BitState;
         let cubes = vec![
             PrimeCube::new(3, 0, 3), // cond=3(data=3) → A=1, B=1
-            PrimeCube::new(1, 1, 0), // cond=1(mask=1) → A=X
+            PrimeCube::new(1, 1, 0), // cond=1(mask=1) → A=X, B=X
         ];
         let pis = prime_cubes_to_implicants::<crate::qm::encoding::Enc16>(&cubes, 2);
         assert_eq!(pis.len(), 2);
         // First: A=One, B=One
-        assert_eq!(pis[0].bits[0], BitState::One);
-        assert_eq!(pis[0].bits[1], BitState::One);
-        // Second: A=DontCare, B=DontCare (cond=0 for both bits)
-        assert_eq!(pis[1].bits[0], BitState::DontCare);
-        assert_eq!(pis[1].bits[1], BitState::DontCare);
+        assert_eq!(pis[0].get_bit(0), BitState::One);
+        assert_eq!(pis[0].get_bit(1), BitState::One);
+        // Second: A=DontCare, B=DontCare (cond=1(mask=1) → both vars are don't-care)
+        assert_eq!(pis[1].get_bit(0), BitState::DontCare);
+        assert_eq!(pis[1].get_bit(1), BitState::DontCare);
     }
 
     #[test]

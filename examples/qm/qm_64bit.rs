@@ -11,7 +11,7 @@ fn main() {
     println!("============================================\n");
 
     const NUM_VARIABLES: usize = 33;
-    const NUM_MINTERMS: usize = 700000;
+    const NUM_MINTERMS: usize = 70000;
     const SEED: u64 = 42;
 
     println!("Generating random minterms with {NUM_VARIABLES} variables");
@@ -24,8 +24,9 @@ fn main() {
     println!("Reducing minterms with Encoding64...");
     let mut solver = QMSolver::<Enc64>::new(NUM_VARIABLES);
     solver.set_logging(true);
+    solver.set_method(qm_agent::qm::SolveMethod::QM);
     solver.set_minterms(minterms);
-
+    
     let result = solver.solve();
     
     println!("Solved in {:?}", start.elapsed());

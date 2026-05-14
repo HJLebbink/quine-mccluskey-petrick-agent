@@ -24,7 +24,7 @@ impl<E: MintermEncoding> PetricksMethod<E> {
     fn get_num_bits(&self) -> usize {
         self.prime_implicants
             .first()
-            .map(|pi| pi.bits.len())
+            .map(|pi| pi.n_variables)
             .unwrap_or(0)
     }
 

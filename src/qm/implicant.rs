@@ -1,10 +1,8 @@
 //! Implicant: Representation of implicants in the Quine-McCluskey algorithm
 //!
-//! Uses `SmallVec<[BitState; 64]>` so implicants for ≤64 variables stay inline
-//! on the stack with zero heap allocation, while still supporting arbitrary sizes.
+//! Uses packed E::Value for all bit state storage (One/Zero/DontCare per variable).
 
 use super::encoding::{BitOps, MintermEncoding};
-use smallvec::smallvec;
 use crate::qm::quine_mccluskey::validate_prime_implicant;
 use std::collections::HashSet;
 
@@ -23,28 +21,25 @@ pub enum BitState {
 /// 0, 1, or DontCare (X).  The `covered_minterms` set is a cache used
 /// during the QM iteration to track which original minterms this cube
 /// covers, enabling O(1) combination checks and uniqueness.
+///
+/// Raw encoding layout stored in `bits`:
+///   - Data bits: lower `n_variables` positions (1 = One, 0 = Zero)
+///   - Don't-care bits: upper `n_variables` positions (1 = DontCare, 0 = One/Zero)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Implicant<E: MintermEncoding> {
-    /// Per-variable bit states. Inline capacity of 64 covers all encoding types.
-    pub bits: smallvec::SmallVec<[BitState; 64]>,
+    pub bits: E::Value,
+    pub n_variables: usize,
     /// Set of original minterms covered by this implicant.
     pub covered_minterms: HashSet<E::Value>,
 }
 
 impl<E: MintermEncoding> Implicant<E> {
     /// Create from a single minterm (no dont-care bits).
-    pub fn from_minterm(minterm: E::Value, variables: usize) -> Self {
-        let mut bits = smallvec![BitState::Zero; variables];
-        for i in 0..variables {
-            bits[i] = if minterm.get_bit(i) {
-                BitState::One
-            } else {
-                BitState::Zero
-            };
-        }
-
+    #[inline]
+    pub fn from_minterm(minterm: E::Value, n_variables: usize) -> Self {
         Self {
-            bits,
+            bits: minterm,
+            n_variables,
             covered_minterms: {
                 let mut s = HashSet::new();
                 s.insert(minterm);
@@ -60,34 +55,37 @@ impl<E: MintermEncoding> Implicant<E> {
     }
 
     /// Get the bit state at position `index` in the implicant.
-    ///
-    /// Returns `BitState::DontCare` if the index is beyond the bit vector.
     #[inline]
     pub fn get_bit(&self, index: usize) -> BitState {
-        self.bits.get(index).copied().unwrap_or(BitState::DontCare)
+        if index < self.n_variables {
+            if self.bits.get_bit(index + self.n_variables) {
+                BitState::DontCare
+            } else if self.bits.get_bit(index) {
+                BitState::One
+            } else {
+                BitState::Zero
+            }
+        } else {
+            BitState::DontCare
+        }
     }
 
     /// Check whether this implicant covers the given minterm.
     ///
     /// First checks the pre-computed `covered_minterms` list for speed,
-    /// then falls back to bit-level matching (used for DontCare expansion
-    /// from min-cubes).
+    /// then falls back to bit-level matching.
     #[inline]
     pub fn covers_minterm(&self, minterm: E::Value) -> bool {
         if self.covered_minterms.contains(&minterm) {
             return true;
         }
-        for (i, &state) in self.bits.iter().enumerate() {
-            if state == BitState::DontCare {
-                continue;
-            }
-            let expected = if state == BitState::One { 1u64 } else { 0u64 };
-            let actual = (minterm.to_u64() >> i) & 1;
-            if actual != expected {
-                return false;
-            }
-        }
-        true
+        let mask = self.get_dc_mask();
+        (self.bits & !mask) == (minterm & !mask)
+    }
+
+    #[inline]
+    fn get_dc_mask(&self) -> E::Value {
+        self.bits >> self.n_variables
     }
 
     #[inline]
@@ -105,49 +103,11 @@ impl<E: MintermEncoding> Implicant<E> {
         result
     }
 
-    /// Convert implicant to raw encoding for batch operations.
-    pub fn to_raw_encoding(&self, variables: usize) -> E::Value {
-        let mut data = E::Value::zero();
-        let mut dont_care = E::Value::zero();
-
-        for i in 0..variables {
-            let bit_pos = (variables - 1) - i; // MSB first
-            match self.bits.get(i).copied().unwrap_or(BitState::DontCare) {
-                BitState::One => {
-                    data = data.set_bit(bit_pos);
-                }
-                BitState::Zero => {
-                    // data bit stays 0
-                }
-                BitState::DontCare => {
-                    dont_care = dont_care.set_bit(bit_pos);
-                }
-            }
-        }
-        // data in lower bits, don't-care mask in upper bits; set data bits to 1 if don't care mask is set
-        data | (dont_care << variables) | dont_care
-    }
-
     /// Create from raw encoding (internal use only).
-    pub(crate) fn from_raw_encoding(raw: E::Value, variables: usize) -> Self {
-        let mask = (E::Value::one() << variables) - E::Value::one();
-        let data = raw & mask;
-        let dont_care_mask = raw >> variables;
-
-        let mut bits = smallvec![BitState::Zero; variables];
-        for i in 0..variables {
-            let bit_pos = (variables - 1) - i;
-            if dont_care_mask.get_bit(bit_pos) {
-                bits[i] = BitState::DontCare;
-            } else if data.get_bit(bit_pos) {
-                bits[i] = BitState::One;
-            } else {
-                //bits[i] = BitState::Zero;
-            }
-        }
-
+    pub(crate) fn from_raw_encoding(raw: E::Value, n_variables: usize) -> Self {
         Self {
-            bits,
+            bits: raw,
+            n_variables,
             covered_minterms: HashSet::new(), // Empty - caller must set this!
         }
     }

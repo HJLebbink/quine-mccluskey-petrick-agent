@@ -74,9 +74,3 @@ struct MObbState {
     best_size: usize,
     best_solution: Vec<usize>,
 }
-
-/// Find first uncovered minterm across all outputs (dominance heuristic)
-fn find_first_uncovered_minterm(covered: &[u64], num_minterms: usize) -> Option<(usize, usize)> {
-    let mut smallest = 0;
-    let mut smallest_count = usize::MAX;
-    let all_on

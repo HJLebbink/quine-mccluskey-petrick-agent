@@ -9,6 +9,16 @@ use super::petricks_method::PetricksMethod;
 use super::qm_result::QMResult;
 use super::quine_mccluskey::QuineMcCluskey;
 
+/// Algorithm selection for QM minimization
+#[derive(Debug, Clone, Copy, Default)]
+pub enum SolveMethod {
+    #[default]
+    /// Use Quine-McCluskey algorithm (with Petrics method)
+    QM,
+    /// Use compressed cubes algorithm
+    MinCubes,
+}
+
 /// High-level solver for Quine-McCluskey Boolean minimization
 pub struct QMSolver<E: MintermEncoding> {
     variables: usize,
@@ -16,6 +26,7 @@ pub struct QMSolver<E: MintermEncoding> {
     dont_cares: Vec<E::Value>,
     variable_names: Vec<String>,
     logging_on: bool,
+    method: SolveMethod,
 }
 
 impl<E: MintermEncoding> QMSolver<E> {
@@ -39,13 +50,18 @@ impl<E: MintermEncoding> QMSolver<E> {
             dont_cares: Vec::with_capacity(0),
             variable_names: names,
             logging_on: false,
+            method: SolveMethod::QM,
         }
     }
 
     pub fn set_logging(&mut self, logging_on: bool) {
         self.logging_on = logging_on;
     }
-    
+
+    pub fn set_method(&mut self, method: SolveMethod) {
+        self.method = method;
+    }
+
     /// Set the minterms that must be covered by the minimization.
     pub fn set_minterms(&mut self, minterms: Vec<E::Value>) {
         self.minterms = minterms;
@@ -57,22 +73,15 @@ impl<E: MintermEncoding> QMSolver<E> {
         self.dont_cares = dont_cares;
     }
 
-    /// Solve the Quine-McCluskey minimization problem using Hamming-distance-1
-    /// merging. Produces a `QMResult` containing the minimized SOP expression,
-    /// all prime implicants, essential prime implicants, solution steps, and
-    /// cost metrics.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Create a `QuineMcCluskey` instance and populate it with minterms
-    ///    and don't-care terms
-    /// 2. Find all prime implicants through iterative combining
-    /// 3. Identify essential prime implicants (those uniquely covering at
-    ///    least one minterm)
-    /// 4. Apply Petrick's method to select a minimal cover
-    /// 5. Format the result into a `QMResult` with SOP expression,
-    ///    implicant lists, solution steps, and cost metrics
+    /// Default solve using Classic method.
     pub fn solve(&self) -> QMResult {
+        match self.method {
+            SolveMethod::QM => self.solve_classic(),
+            SolveMethod::MinCubes => self.solve_min_cubes_internal(),
+        }
+    }
+
+    fn solve_classic(&self) -> QMResult {
         let mut qm = QuineMcCluskey::<E>::new(self.variables);
         qm.set_logging_on(self.logging_on);
         qm.set_minterms(self.minterms.clone());
@@ -93,57 +102,7 @@ impl<E: MintermEncoding> QMSolver<E> {
         }
     }
 
-    fn format_expression(&self, implicants: &[Implicant<E>]) -> String {
-        if implicants.is_empty() {
-            return "0".to_string();
-        }
-
-        implicants
-            .iter()
-            .map(|imp| self.format_single_implicant(imp))
-            .collect::<Vec<_>>()
-            .join(" + ")
-    }
-
-    fn format_single_implicant(&self, implicant: &Implicant<E>) -> String {
-        let mut result = String::new();
-        for i in 0..self.variables {
-            match implicant.get_bit(i) {
-                BitState::Zero => result.push_str(&format!("{}'", self.variable_names[i])),
-                BitState::One => result.push_str(&self.variable_names[i]),
-                BitState::DontCare => {}
-            }
-        }
-        if result.is_empty() {
-            "1".to_string()
-        } else {
-            result
-        }
-    }
-
-    fn format_implicants(&self, implicants: &[Implicant<E>]) -> Vec<String> {
-        implicants
-            .iter()
-            .map(|imp| self.format_single_implicant(imp))
-            .collect()
-    }
-
-    fn calculate_original_cost(&self) -> usize {
-        self.minterms.len() * self.variables
-    }
-
-    // -----------------------------------------------------------------------
-    // Min-cubes solver using condition-combination PI generation
-    // -----------------------------------------------------------------------
-
-    /// Solve using the min-cubes prime implicant generation algorithm.
-    ///
-    /// Produces an identical `QMResult` as `solve()` but via condition
-    /// combination enumeration instead of Hamming-distance-1 merging.
-    /// The min-cubes approach iterates through condition subsets and builds
-    /// cubes from valid signatures, which can be significantly faster for
-    /// dense problems with many variables.
-    pub fn solve_min_cubes(&self) -> QMResult {
+    fn solve_min_cubes_internal(&self) -> QMResult {
         // 1. Build truth table from minterms + dont-cares
         let n_conds = self.variables;
         let minterm_bits: Vec<u64> = self.minterms.iter().map(|m| m.to_u64() as u64).collect();
@@ -201,6 +160,44 @@ impl<E: MintermEncoding> QMSolver<E> {
             cost_original: self.calculate_original_cost(),
             cost_minimized: minimal_cover.len() * 2,
         }
+    }
+
+    fn format_expression(&self, implicants: &[Implicant<E>]) -> String {
+        if implicants.is_empty() {
+            return "0".to_string();
+        }
+        implicants
+            .iter()
+            .map(|imp| self.format_single_implicant(imp))
+            .collect::<Vec<_>>()
+            .join(" + ")
+    }
+
+    fn format_single_implicant(&self, implicant: &Implicant<E>) -> String {
+        let mut result = String::new();
+        for i in 0..self.variables {
+            match implicant.get_bit(i) {
+                BitState::Zero => result.push_str(&format!("{}'", self.variable_names[i])),
+                BitState::One => result.push_str(&self.variable_names[i]),
+                BitState::DontCare => {}
+            }
+        }
+        if result.is_empty() {
+            "1".to_string()
+        } else {
+            result
+        }
+    }
+
+    fn format_implicants(&self, implicants: &[Implicant<E>]) -> Vec<String> {
+        implicants
+            .iter()
+            .map(|imp| self.format_single_implicant(imp))
+            .collect()
+    }
+
+    fn calculate_original_cost(&self) -> usize {
+        self.minterms.len() * self.variables
     }
 }
 

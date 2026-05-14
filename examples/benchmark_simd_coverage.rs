@@ -7,7 +7,7 @@
 
 use qm_agent::qm::CoverageMatrix;
 use qm_agent::qm::encoding::Enc16;
-use qm_agent::qm::implicant::{BitState, Implicant};
+use qm_agent::qm::implicant::Implicant;
 use std::time::{Duration, Instant};
 
 const NUM_PRIME_IMPLICANTS: usize = 100;
@@ -17,13 +17,16 @@ const BENCHMARK_ITERATIONS: usize = 100;
 
 /// Check if an implicant covers a minterm based on bit pattern
 fn implicant_covers_minterm(implicant: &Implicant<Enc16>, minterm: u32) -> bool {
-    for (bit_idx, bit_state) in implicant.bits.iter().enumerate() {
-        let minterm_bit = (minterm >> bit_idx) & 1;
-        match bit_state {
-            BitState::Zero if minterm_bit != 0 => return false,
-            BitState::One if minterm_bit != 1 => return false,
-            BitState::DontCare => continue,
-            _ => continue,
+    let mask = implicant.bits >> implicant.n_variables;
+    for i in 0..implicant.n_variables {
+        let dc = ((mask >> i) & 1) == 1;
+        if dc {
+            continue;
+        }
+        let expected = ((implicant.bits >> i) & 1) == 1;
+        let actual = ((minterm >> i) & 1) == 1;
+        if actual != expected {
+            return false;
         }
     }
     true
@@ -62,24 +65,34 @@ fn build_coverage_matrix_simd(
 fn generate_test_prime_implicants(count: usize, num_bits: usize) -> Vec<Implicant<Enc16>> {
     use rand::Rng;
     let mut rng = rand::rng();
-    let mut implicants = Vec::new();
-
-    for _ in 0..count {
-        let mut pi = Implicant::<Enc16>::from_minterm(0, num_bits);
-
-        // Randomly set each bit to Zero, One, or DontCare
-        for bit_idx in 0..num_bits {
-            pi.bits[bit_idx] = match rng.random_range(0u8..3) {
-                0 => BitState::Zero,
-                1 => BitState::One,
-                _ => BitState::DontCare,
-            };
-        }
-
-        implicants.push(pi);
-    }
-
-    implicants
+    (0..count)
+        .map(|_| {
+            let mut bits = 0u32;
+            for bit_idx in 0..num_bits {
+                let mut is_one = false;
+                let mut is_dc = false;
+                match rng.random_range(0u8..3) {
+                    0 => {} // Zero
+                    1 => is_one = true,
+                    _ => {
+                        is_one = true;
+                        is_dc = true;
+                    }
+                }
+                if is_one {
+                    bits |= 1u32 << (bit_idx as u32);
+                }
+                if is_dc {
+                    bits |= 1u32 << ((bit_idx + num_bits) as u32);
+                }
+            }
+            Implicant {
+                bits,
+                n_variables: num_bits,
+                covered_minterms: std::collections::HashSet::new(),
+            }
+        })
+        .collect()
 }
 
 /// Generate random minterms for testing

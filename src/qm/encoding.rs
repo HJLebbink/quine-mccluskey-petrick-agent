@@ -181,8 +181,9 @@ pub trait MintermEncoding: Copy + fmt::Debug {
     /// Find all Hamming-distance-1 pairs between two groups of implicants.
     ///
     /// Given indices into `raw_encodings` for group1 and group2, returns pairs
-    /// `(i, j)` where the two implicants differ by exactly one bit. The actual
-    /// implementation depends on the encoding type (typically fxhash-based lookup).
+    /// `(i, j)` where the two implicants differ by exactly one bit. Dispatches to
+    /// AVX-512 implementations (16/8/4 parallel lanes for u32/u64/u128) with
+    /// scalar fallback when AVX-512 is unavailable.
     fn find_gray_code_pairs(
         group1_indices: &[usize],
         group2_indices: &[usize],

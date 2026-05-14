@@ -6,7 +6,7 @@
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 use super::encoding::{BitOps, MintermEncoding};
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-use super::implicant::{BitState, Implicant};
+use super::implicant::Implicant;
 
 /// Bit-packed coverage matrix for memory-efficient storage.
 ///
@@ -469,24 +469,17 @@ unsafe fn check_coverage_batch_5bit(
 ///
 /// BitState::Zero contributes nothing to either output.
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-fn extract_implicant_representation<E: MintermEncoding>(implicant: &Implicant<E>) -> (u8, u8) {
-    let mut value = 0u8;
-    let mut mask = 0u8;
+fn extract_implicant_representation<E: MintermEncoding>(
+    implicant: &Implicant<E>,
+) -> (u8, u8) {
+    let n = implicant.n_variables.min(5);
+    let mask_bits = (1u64 << n) - 1;
+    let raw = implicant.bits.to_u64();
+    let data = (raw & mask_bits) as u8;
+    let dc = ((raw >> n) & mask_bits) as u8;
 
-    for (i, bit) in implicant.bits.iter().enumerate() {
-        match bit {
-            BitState::Zero => {
-                // value bit stays 0, mask bit stays 0 (must match)
-            }
-            BitState::One => {
-                value |= 1 << i; // Set bit in value
-                // mask bit stays 0 (must match)
-            }
-            BitState::DontCare => {
-                mask |= 1 << i; // Set bit in mask (don't care)
-            }
-        }
-    }
+    let value = data & !dc; // One where not DontCare
+    let mask = dc;
 
     (value, mask)
 }
@@ -494,19 +487,41 @@ fn extract_implicant_representation<E: MintermEncoding>(implicant: &Implicant<E>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::qm::encoding::Enc16;
+    use crate::qm::implicant::BitState;
+
+    /// Construct raw encoding from BitStates for tests.
+    fn build_test_bits_raw(n_variables: usize, states: &[BitState]) -> u64 {
+        let mut raw = 0u64;
+        for (i, &state) in states.iter().enumerate().take(n_variables) {
+            match state {
+                BitState::One => {
+                    raw |= 1u64 << i;
+                }
+                BitState::DontCare => {
+                    raw |= 1u64 << i;
+                    raw |= 1u64 << (i + n_variables);
+                }
+                BitState::Zero => {}
+            }
+        }
+        raw
+    }
 
     #[test]
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     fn test_extract_implicant_representation() {
-        let mut pi = Implicant::<Enc16>::from_minterm(0, 4);
-        pi.bits.clear();
-        pi.bits.extend([
+        // Construct: Zero, DontCare, One, DontCare at indices 0,1,2,3
+        let raw = build_test_bits_raw(4, &[
             BitState::Zero,
             BitState::DontCare,
             BitState::One,
             BitState::DontCare,
         ]);
+        let pi: Implicant<crate::qm::encoding::Enc16> = Implicant {
+            bits: raw as u32,
+            n_variables: 4,
+            covered_minterms: std::collections::HashSet::new(),
+        };
 
         let (value, mask) = extract_implicant_representation(&pi);
 

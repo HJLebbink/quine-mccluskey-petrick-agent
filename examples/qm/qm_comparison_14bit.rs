@@ -62,6 +62,7 @@ fn main_inner<E: MintermEncoding>(logging_on: bool) {
 
     let mut solver = QMSolver::<E>::new(N_VARIABLES);
     solver.set_logging(logging_on);
+    solver.set_method(qm_agent::qm::SolveMethod::QM);
     solver.set_minterms(minterms);
 
     if logging_on {

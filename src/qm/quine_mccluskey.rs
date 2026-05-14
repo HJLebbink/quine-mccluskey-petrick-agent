@@ -77,10 +77,7 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             .iter()
             .map(|&term| Implicant::from_minterm(term, self.variables))
             .collect();
-
-        #[cfg(debug_assertions)]
-        validate_prime_implicants(&current_level, self.variables);
-
+        
         let mut prime_implicants: Vec<Implicant<E>> = Vec::new();
         let mut order = 1;
 
@@ -102,12 +99,8 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             // So we only need to compare groups[k] with groups[k+1]
             use std::collections::HashMap;
             let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
-
-            // Convert all implicants to raw encoding for fast operations
-            let raw_encodings: Vec<E::Value> = current_level
-                .iter()
-                .map(|imp| imp.to_raw_encoding(self.variables))
-                .collect();
+            
+            let raw_encodings: Vec<E::Value> = current_level.iter().map(|i| i.bits).collect::<Vec<_>>();
 
             // Group by Hamming weight using fast pop-count on raw encoding
             for (idx, &raw_value) in raw_encodings.iter().enumerate() {
@@ -150,9 +143,6 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
                         let raw_combined: E::Value =
                             Implicant::<E>::replace_complements(raw_i, raw_j, self.variables);
 
-                        #[cfg(debug_assertions)]
-                        validate_prime_implicant::<E>(&raw_combined, self.variables);
-
                         let entry = next_level_map.entry(raw_combined).or_insert_with(HashSet::new);
                         entry.extend(&current_level[i].covered_minterms);
                         entry.extend(&current_level[j].covered_minterms);
@@ -162,12 +152,7 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
             // Convert back to Implicants with proper covered_minterms
             for (raw_value, covered) in next_level_map {
-
-                #[cfg(debug_assertions)]
-                validate_prime_implicant::<E>(&raw_value, self.variables);
-
                 let mut combined_imp = Implicant::<E>::from_raw_encoding(raw_value, self.variables);
-
                 combined_imp.covered_minterms = covered;
                 next_level.push(combined_imp);
             }
@@ -213,9 +198,7 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
         // Build a coverage map: minterm -> list of prime implicants that cover it
         let mut coverage_map: std::collections::HashMap<E::Value, Vec<usize>> =
             std::collections::HashMap::new();
-
-        println!("Y2: #minterm {}; #pis {}", self.minterms.len(), all_pis.len());
-
+        
         for minterm in &self.minterms {
             for (pi_idx, pi) in all_pis.iter().enumerate() {
                 if pi.covers_minterm(*minterm) {
@@ -279,7 +262,7 @@ pub fn validate_prime_implicants<E: MintermEncoding>(
 ) {
     let mut seen = std::collections::HashMap::new();
     for (idx, pi) in implicants.iter().enumerate() {
-        let raw: E::Value = pi.to_raw_encoding(variables);
+        let raw: E::Value = pi.bits;
 
         validate_prime_implicant::<E>(&raw, variables);
 
