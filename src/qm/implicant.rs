@@ -6,6 +6,7 @@
 use super::encoding::{BitOps, MintermEncoding};
 use smallvec::smallvec;
 use crate::qm::quine_mccluskey::validate_prime_implicant;
+use std::collections::HashSet;
 
 /// State of a bit in an implicant: Zero, One, or DontCare
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,15 +20,15 @@ pub enum BitState {
 ///
 /// An implicant represents a cube (a product term) in the Karnaugh map /
 /// Boolean expression.  Each bit corresponds to a variable and can be
-/// 0, 1, or DontCare (X).  The `covered_minterms` list is a cache used
+/// 0, 1, or DontCare (X).  The `covered_minterms` set is a cache used
 /// during the QM iteration to track which original minterms this cube
-/// covers, enabling O(1) combination checks.
+/// covers, enabling O(1) combination checks and uniqueness.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Implicant<E: MintermEncoding> {
     /// Per-variable bit states. Inline capacity of 64 covers all encoding types.
     pub bits: smallvec::SmallVec<[BitState; 64]>,
     /// Set of original minterms covered by this implicant.
-    pub covered_minterms: Vec<E::Value>,
+    pub covered_minterms: HashSet<E::Value>,
 }
 
 impl<E: MintermEncoding> Implicant<E> {
@@ -44,14 +45,18 @@ impl<E: MintermEncoding> Implicant<E> {
 
         Self {
             bits,
-            covered_minterms: vec![minterm],
+            covered_minterms: {
+                let mut s = HashSet::new();
+                s.insert(minterm);
+                s
+            },
         }
     }
 
-    /// Get a reference to the list of minterms covered by this implicant.
+    /// Get an iterator over the minterms covered by this implicant.
     #[inline]
-    pub fn get_covered_minterms(&self) -> &[E::Value] {
-        &self.covered_minterms
+    pub fn covered_minterms_iter(&self) -> impl Iterator<Item = &E::Value> {
+        self.covered_minterms.iter()
     }
 
     /// Get the bit state at position `index` in the implicant.
@@ -143,7 +148,7 @@ impl<E: MintermEncoding> Implicant<E> {
 
         Self {
             bits,
-            covered_minterms: Vec::new(), // Empty - caller must set this!
+            covered_minterms: HashSet::new(), // Empty - caller must set this!
         }
     }
 }

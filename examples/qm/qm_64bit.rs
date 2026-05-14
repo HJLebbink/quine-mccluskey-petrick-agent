@@ -23,12 +23,12 @@ fn main() {
     
     println!("Reducing minterms with Encoding64...");
     let mut solver = QMSolver::<Enc64>::new(NUM_VARIABLES);
+    solver.set_logging(true);
     solver.set_minterms(minterms);
+
     let result = solver.solve();
     
-    let elapsed = start.elapsed();
-
-    println!("Solved in {:?}", elapsed);
+    println!("Solved in {:?}", start.elapsed());
     println!("\nnumber of Prime Implicants: {}",  result.prime_implicants.len());
     println!("\nnumber of Essential Prime Implicants: {}", result.essential_prime_implicants.len());
 }

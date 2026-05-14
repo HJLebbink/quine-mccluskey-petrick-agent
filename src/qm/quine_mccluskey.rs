@@ -86,8 +86,7 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
         while !current_level.is_empty() {
             let msg = format!(
-                "Step {}: Processing {order}-order implicants (#{})",
-                order + 1,
+                "Step {order}: Processing {order}-order implicants (#{})",
                 current_level.len()
             );
             if self.logging_on {
@@ -119,7 +118,8 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
             // Use HashMap for deduplication while tracking covered_minterms
             use std::collections::HashMap as DedupeMap;
-            let mut next_level_map: DedupeMap<E::Value, Vec<E::Value>> = DedupeMap::new();
+            use std::collections::HashSet;
+            let mut next_level_map: DedupeMap<E::Value, HashSet<E::Value>> = DedupeMap::new();
 
             // Only compare adjacent Hamming weight groups
             let max_bit_count = groups.keys().max().copied().unwrap_or(0);
@@ -152,8 +152,8 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
 
                         #[cfg(debug_assertions)]
                         validate_prime_implicant::<E>(&raw_combined, self.variables);
-                        
-                        let entry = next_level_map.entry(raw_combined).or_insert_with(Vec::new);
+
+                        let entry = next_level_map.entry(raw_combined).or_insert_with(HashSet::new);
                         entry.extend(&current_level[i].covered_minterms);
                         entry.extend(&current_level[j].covered_minterms);
                     }
@@ -161,13 +161,10 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
             }
 
             // Convert back to Implicants with proper covered_minterms
-            for (raw_value, mut covered) in next_level_map {
+            for (raw_value, covered) in next_level_map {
 
                 #[cfg(debug_assertions)]
                 validate_prime_implicant::<E>(&raw_value, self.variables);
-
-                covered.sort_unstable();
-                covered.dedup();
 
                 let mut combined_imp = Implicant::<E>::from_raw_encoding(raw_value, self.variables);
 
@@ -211,11 +208,13 @@ impl<E: MintermEncoding> QuineMcCluskey<E> {
     /// specific minterms. These must be included in any minimal solution.
     /// Returns (all_prime_implicants, essential_prime_implicants)
     pub fn find_essential_prime_implicants(&mut self) -> (Vec<Implicant<E>>, Vec<Implicant<E>>) {
-        let all_pis = self.find_prime_implicants();
+        let all_pis: Vec<Implicant<E>> = self.find_prime_implicants();
 
         // Build a coverage map: minterm -> list of prime implicants that cover it
         let mut coverage_map: std::collections::HashMap<E::Value, Vec<usize>> =
             std::collections::HashMap::new();
+
+        println!("Y2: #minterm {}; #pis {}", self.minterms.len(), all_pis.len());
 
         for minterm in &self.minterms {
             for (pi_idx, pi) in all_pis.iter().enumerate() {

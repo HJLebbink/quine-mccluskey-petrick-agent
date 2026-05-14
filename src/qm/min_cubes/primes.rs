@@ -420,7 +420,7 @@ pub fn prime_cubes_to_implicants<E: MintermEncoding>(
             }
             Implicant {
                 bits,
-                covered_minterms: Vec::new(),
+                covered_minterms: std::collections::HashSet::new(),
             }
         })
         .collect()
@@ -437,11 +437,11 @@ pub fn populate_covered_minterms_u64<E: MintermEncoding>(
     n_vars: usize,
 ) {
     for pi in pis.iter_mut() {
-        let mut covered = Vec::with_capacity(all_minterms.len());
+        let mut covered = std::collections::HashSet::new();
         for mt in all_minterms {
             let raw = mt.to_u64();
             if covers_implicant_u64(&pi.bits, raw, n_vars) {
-                covered.push(*mt);
+                covered.insert(*mt);
             }
         }
         pi.covered_minterms = covered;
